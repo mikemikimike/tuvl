@@ -10,6 +10,12 @@ Releases are cut by hand: `make bump VERSION=x.y.z`, update this file, tag `vX.Y
 
 ## [Unreleased]
 
+---
+
+## [2.0.0] — 2026-11-01
+
+The first stable 2.0 release. Everything since `2.0.0-beta.10` is below; the beta sections that follow record how 2.0 was built.
+
 ### Added
 
 - **Browser apps on another origin can call the API.** `spec.api.cors_origins` in `.tuvl/system.yaml` (or `TUVL_CORS_ORIGINS`, which wins) lists the origins allowed to call it. Nothing is allowed by default, including in dev, so existing servers behave as before. An origin is `scheme://host[:port]` with no trailing slash: `tuvl lint project` rejects anything else and warns on `*`, and the server leaves a malformed entry out. The middleware is the outermost one, so a preflight is answered before the IP allowlist or auth, and a `401` still carries the headers; it exposes `X-Tuvl-Run-Id`, which `@tuvl/client` reads, and sends no credentials mode (tokens are bearer headers). `tuvl generate ui-spec` says in its backend-surface section whether a browser may call from another origin.

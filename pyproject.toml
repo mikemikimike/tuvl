@@ -1,6 +1,6 @@
 [project]
 name = "tuvl"
-version = "2.0.0b10"
+version = "2.0.0"
 description = "Typed workflows of agents — code, database/HTTP/MCP tools, rules, models, bounded tool loops and people — on a durable, journaled runtime, built spec-first and served as REST, SSE and MCP"
 readme = "README.md"
 requires-python = ">=3.13,<3.15"
@@ -61,7 +61,7 @@ dependencies = [
 # and testing runs with breakpoints, step mode and approvals.
 # Install with: pip install tuvl[standard]
 standard = [
-    "tuvl-insight>=2.0.0b10",
+    "tuvl-insight>=2.0.0",
     "tuvl[mcp,redis,vector,otel-grpc,codegen,test,pdf,review,tui]",
 ]
 

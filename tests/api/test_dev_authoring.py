@@ -17,7 +17,12 @@ from tuvl.spec.ideas import import_idea, plan_import
 
 
 @pytest.fixture
-def project(tmp_path: Path) -> Path:
+def project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    # the spec commands record who acted from git's user.name: give them one that does not depend on the machine
+    gitconfig = tmp_path / "gitconfig"
+    gitconfig.write_text("[user]\n\tname = Ada\n\temail = ada@example.com\n")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(gitconfig))
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     p = tmp_path / "proj"
     p.mkdir()
     brief = tmp_path / "brief"

@@ -185,7 +185,7 @@ async def test_the_retention_sweep_applies_each_collections_shortest_retention(
             ]
         )
         await s.commit()
-    monkeypatch.setattr(memory, "_last_retention", 0.0)
+    monkeypatch.setattr(memory, "_last_retention", float("-inf"))
     async with AsyncSession(pg_engine) as s:
         assert await memory.retention_sweep(s) == 1
         await s.commit()

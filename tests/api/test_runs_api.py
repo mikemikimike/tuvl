@@ -541,7 +541,7 @@ async def test_an_ended_runs_drafts_are_not_replayed_and_the_sweep_removes_them(
     assert "token_" not in again.text  # an ended run replays only its journal
 
     monkeypatch.setattr(deltas, "GRACE", timedelta(0))
-    monkeypatch.setattr(deltas, "_last_sweep", 0.0)
+    monkeypatch.setattr(deltas, "_last_sweep", float("-inf"))
     async with AsyncSession(host.engine) as s:
         await deltas.sweep(s)
         await s.commit()

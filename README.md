@@ -24,14 +24,16 @@ signals it emits — and an **engine** that implements it:
 | Engine | | Determinism |
 |---|---|---|
 | `code` | a Python function | deterministic |
-| `tool` | a database, HTTP or MCP operation | deterministic |
+| `tool` | a database, HTTP, blob storage or MCP operation | deterministic |
 | `decide` | ordered rules, then an optional decision model | deterministic → bounded |
 | `llm` | one structured model call | bounded |
 | `loop` | a model using tools within hard budgets | bounded |
+| `map` | a workflow run once for every item of a list | as the child |
+| `parallel` | different read-only lookups at the same time | as the branches |
 | `human` | a form for a person | external |
 | `pending` | a contract waiting for an implementation | — |
 
-Signals route to the next agent or a named end. `tuvl validate` checks contracts, data flow, types
+Signals route to the next agent or a named end. `tuvl lint project` checks contracts, data flow, types
 and policy statically and prints each workflow's determinism profile and worst-case token cost. Every
 run is **durable and journaled**: it survives restarts, waits for people, can be paused, stepped and
 steered, and can be pinned and replayed as a zero-token test fixture.
@@ -78,42 +80,58 @@ spec:
 uv tool install "tuvl[standard]"     # CLI + Insight (dev UI)
 # or, in a project
 uv add "tuvl[standard]"
-npm install @tuvl/client             # TypeScript client
 ```
 
-Coming from 1.x? Run `uv tool upgrade tuvl`; there is no 1.x compatibility layer, see the [CHANGELOG](CHANGELOG.md).
-Report issues on [GitHub](https://github.com/tuvl-io/tuvl/issues).
-
-`tuvl` alone is the production server; `[standard]` adds **Insight**, served only in dev mode.
+`tuvl` alone is the production server; `[standard]` adds **Insight**, served only in dev mode, and the
+development tools (`tuvl generate code`, `tuvl run tests`, `tuvl serve mcp`). Features with their own packages are
+extras: `tuvl[mcp]`, `tuvl[redis]`, `tuvl[vector]`, `tuvl[otel-grpc]`. `tuvl ship` installs only the ones a project uses.
 
 ## Quick start
 
 ```bash
 tuvl init demo --sample --preset gemini -y     # a ticket-triage project with a spec, tests and a lock
 cd demo
-tuvl validate --strict                         # contracts, data flow, cost
-tuvl test                                      # offline tests
+tuvl lint project --strict                         # contracts, data flow, cost
+tuvl run tests                                      # offline tests
 tuvl dev --auto-login                          # Insight at http://localhost:8885/insight
 ```
 
 ## Spec-driven
 
 ```bash
-tuvl spec new refund-automation      # write the intent (Markdown, with checked Data and Flows)
-tuvl spec check                      # is the spec complete and consistent? (zero tokens)
-tuvl spec verify                     # does the implementation match it, step by step?
-tuvl spec status                     # task statuses, derived — never typed in
-tuvl codegen                         # schemas, code stubs, tests (no model)
+tuvl create spec refund-automation      # write the intent (Markdown, with checked Data and Flows)
+tuvl lint spec                      # is the spec complete and consistent? (zero tokens)
+tuvl verify spec                     # does the implementation match it, step by step?
+tuvl list tasks                     # task statuses, derived — never typed in
+tuvl generate code                         # schemas, code stubs, tests (no model)
 ```
 
 The coding agent builds; tuvl referees. Every step above is deterministic and spends no tokens.
-Coding agents get the same operations over MCP (`tuvl mcp`) and a skill set in `.agents/skills/`.
+Coding agents get the same operations over MCP (`tuvl serve mcp`) and a skill set in `.agents/skills/`.
 
 The CI gate:
 
 ```bash
-tuvl validate --strict && tuvl codegen --check && tuvl lock --check && tuvl test && tuvl spec status --strict
+tuvl lint project --strict && tuvl generate code --check && tuvl verify lock && tuvl run tests && tuvl list tasks --strict
 ```
+
+
+## Authoring with your coding agent
+
+Already have Claude Code, Codex or Gemini CLI? tuvl can drive it from an idea to a packaged project, and
+accept only what its own checks (no model in the loop) pass:
+
+```bash
+tuvl import idea brief.pdf           # IDEA-SK-0004: a numbered, immutable copy of the brief
+                                     # (or --url <web page, Jira or GitHub issue>: a snapshot of it)
+tuvl generate spec --idea IDEA-SK-0004    # your agent drafts SPEC-SK-0004-01 on a branch; a person approves it
+tuvl approve spec SPEC-SK-0004-01 && tuvl generate tasks SPEC-SK-0004-01
+tuvl generate code --spec SPEC-SK-0004-01 --all   # models and skeletons first, then your agent, one PR per task
+tuvl review code && tuvl ship --format both      # gate, image and a runnable archive
+```
+
+`tuvl dev` shows the same path in a terminal UI, and every step is in a local audit ledger. Details:
+[docs/authoring.md](docs/authoring.md).
 
 ## Surfaces
 
@@ -128,8 +146,8 @@ tuvl validate --strict && tuvl codegen --check && tuvl lock --check && tuvl test
 ## Production
 
 ```bash
-tuvl lock && tuvl ship --tag registry/app:1.0    # gates, Dockerfile (pinned tuvl), Helm chart
-tuvl run --role api        # or: worker — scale HTTP and execution separately
+tuvl generate lock && tuvl ship --tag registry/app:1.0    # gates, Dockerfile (pinned tuvl + only the extras you use), Helm chart
+tuvl serve app --role api        # or: worker — scale HTTP and execution separately
 ```
 
 Ed25519-signed JWT auth, default-deny triggers, scoped CRUD, approvals with no self-approval, secure
@@ -140,7 +158,7 @@ fields kept away from models, optional Postgres row-level multi-tenancy.
 [tuvl.dev](https://tuvl.dev) · in this repository: [agentic manual](docs/tuvl-agentic-manual.md),
 [runtime](docs/runtime.md), [engines](docs/engines.md), [decide](docs/decide.md),
 [loop and tools](docs/loop-and-tools.md), [judges](docs/judges.md),
-[spec-driven](docs/spec-driven.md), [Insight](docs/insight.md), [API](docs/api.md),
+[storage](docs/storage.md), [models](docs/models.md), [spec-driven](docs/spec-driven.md), [Insight](docs/insight.md), [API](docs/api.md),
 [CLI](docs/cli.md), [security](docs/auth.md), [observability](docs/observability.md).
 
 ---
@@ -151,11 +169,11 @@ tuvl is licensed under the **Apache License, Version 2.0** — see [LICENSE](LIC
 [NOTICE](NOTICE). It is free to use, modify and distribute, with an express patent grant.
 The name "tuvl" and the logos are not licensed for use as a brand (Apache-2.0 §6).
 
-Releases up to and including `2.0.0b4` were published under the MIT License and remain available under it. Starting with `2.0.0` tuvl is Apache-2.0.
+Releases before `2.0.0b5` keep the terms they were published with. From `2.0.0b5` tuvl is
+Apache-2.0; see the [changelog](CHANGELOG.md).
 
-Development currently happens in a private repository, so the full source is not
-yet publicly browsable. This is temporary: the complete codebase will be
-published openly in a future release. In the meantime the project is **open to
-contribution** — bug reports, feature proposals, and patches are all welcome.
-See [CONTRIBUTING](CONTRIBUTING.md) to get started, or reach out at
-[developer@tuvl.io](mailto:developer@tuvl.io).
+The source of every release is published at [tuvl-io/tuvl](https://github.com/tuvl-io/tuvl), tagged with the
+release version. Bug reports, feature proposals and patches are welcome; see
+[CONTRIBUTING](CONTRIBUTING.md) for how a change lands and the [code of conduct](CODE_OF_CONDUCT.md).
+Security reports go to [security@tuvl.io](mailto:security@tuvl.io), never to a public issue; see
+[SECURITY](SECURITY.md). Anything else: [developer@tuvl.io](mailto:developer@tuvl.io).

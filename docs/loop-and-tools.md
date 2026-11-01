@@ -19,6 +19,8 @@ derived from contracts, never hand-written.
       - agent: lookup_order                     # off-spine agent in this workflow
       - workflow: issue_refund                  # another workflow as a child run
         approval: { when: "args.amount > 200", required_group: support_manager }
+      - collection: kb_docs                     # search a collection (read-only)
+        top_k: 3
       - mcp: artifact://zendesk@3
         allow: [add_comment, set_status]        # required allow-list
         max_calls: 3
@@ -35,6 +37,7 @@ derived from contracts, never hand-written.
 |---|---|---|
 | `agent: <id>` | The agent's `inputs` → parameters, `description` → tool description | The runner executes that agent with the model's arguments; its own `routes` are ignored |
 | `workflow: <name>` | The workflow's `trigger.input` and description | A **child run** with its own journal, gates and budget; its tokens count toward the parent's `max_tokens`; nesting capped by `policy.max_depth` (default 2) |
+| `collection: <name>` | One parameter, `query` (a string). The tool is named `search_<collection>`, or `name:` when given | The same hybrid search as `tuvl.data_search`, with `top_k` (default 5), `filter` and `scope` fixed in the YAML, not chosen by the model; returns `{passages: [{content, metadata, score}]}`. It is a read, so it needs no approval; `tuvl lint project` checks that the collection is defined |
 | `mcp: artifact://x` | The server's `tools/list`, filtered by `allow` | Through the artifact's connection; each allowed tool's schema hash is pinned in `tuvl.lock` |
 
 The model's arguments are validated against the tool's schema before execution; invalid arguments
@@ -51,6 +54,13 @@ results stay inside the loop — only the declared `outputs` reach the run conte
 Each tool's **effect** is derived (the agent's, the child workflow's strongest, or the MCP hints) and
 shown to the model and in Insight. Write/destructive MCP calls are at-least-once; V015 asks for an
 approval or `compensate`.
+
+### Calls in the same turn
+
+When a model turn asks for several MCP tools that are marked `readOnlyHint` and need no approval, they run at the same
+time: the turn takes about as long as the slowest. Events and the transcript keep the order the model asked in, and
+`budget.max_tool_calls` and `max_calls` are counted as before. Writes, approvals, and agent, workflow and collection tools
+still run one at a time (they share the run's database session).
 
 ### In-loop approval
 

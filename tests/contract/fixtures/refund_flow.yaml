@@ -1,0 +1,95 @@
+# Spec Appendix A.1 — kept verbatim so the spec's own example stays valid.
+kind: Workflow
+version: tuvl/v2
+metadata:
+  name: refund_flow
+  description: Handle a customer refund request end to end.
+  required_scope: refunds:write
+spec:
+  models: [Order, Refund]
+  trigger:
+    http: { path: /api/refunds, method: POST }
+    mcp:  { enabled: true }
+    input: { order_id: uuid, reason: str, message: str }
+  start: load_order
+  agents:
+    - id: load_order
+      description: Load the order being refunded
+      engine: tool
+      inputs:  { order_id: uuid }
+      outputs: { order: Order }
+      tool: { use: db, model: Order, op: read, where: { id: "{{ order_id }}" } }
+      routes: { default: triage_refund, not_found: END.not_found, error: END.failed }
+
+    - id: triage_refund
+      description: Decide how a refund is handled
+      engine: decide
+      inputs:  { order: Order, reason: str, message: str }
+      outputs: { route: "enum[auto_refund, manager_review, reject]" }
+      budget:  { timeout: 2s, retry: { attempts: 1 } }
+      decide:
+        rules:
+          - { when: "order.total > 500",         then: manager_review }
+          - { when: "reason == \"fraud_flag\"",  then: reject }
+        model: { ref: triage-classifier, min_confidence: 0.8 }
+      routes:
+        auto_refund: issue_refund
+        manager_review: approval
+        reject: END.rejected
+        low_confidence: approval
+        error: END.failed
+
+    - id: approval
+      description: Support manager approves or rejects the refund
+      engine: human
+      inputs:  { order: Order, message: str }
+      outputs: { approved: bool, note: "str?" }
+      human:
+        title: "Refund for order {{ order.id }}"
+        show: [order, message]
+        required_group: support_manager
+        expires: 48h
+        route_on: approved
+      routes: { "true": issue_refund, "false": END.rejected, expired: END.failed, error: END.failed }
+
+    - id: issue_refund
+      description: Calculate the refund amount and record it
+      engine: code
+      effect: write
+      inputs:  { order: Order, reason: str }
+      outputs: { refund: Refund }
+      code: { run: issue_refund }
+      compensate: void_refund
+      routes: { default: reply, error: END.failed }
+
+    - id: void_refund                       # off-spine compensator
+      description: Mark a recorded refund as void
+      engine: tool
+      inputs:  { refund: Refund }
+      outputs: {}
+      tool: { use: db, model: Refund, op: update, where: { id: "{{ refund.id }}" }, values: { status: void } }
+      routes: { default: END, error: END.failed }
+
+    - id: reply
+      description: Write the customer confirmation
+      engine: llm
+      inputs:  { order: Order, refund: Refund }
+      outputs: { text: str }
+      budget:  { timeout: 20s, max_tokens: 1500, retry: { attempts: 2, errors: [parse_error, timeout] } }
+      llm:
+        model: default
+        system: artifact://support-voice@3
+        prompt: Write a short confirmation of the refund.
+      guardrails: { output: [artifact://refund-reply-quality@2] }
+      routes: { default: END, guardrail_violation: END.failed, parse_error: END.failed,
+                timeout: END.failed, budget_exceeded: END.failed, error: END.failed }
+
+  outputs:
+    default:   { status: 200, body: { refund_id: "{{ refund.id }}", amount: "{{ refund.amount }}", message: "{{ text }}" } }
+    rejected:  { status: 200, body: { status: rejected } }
+    not_found: { status: 404, body: { error: order not found } }
+    failed:    { status: 500, rollback: true, body: { error: refund failed } }
+
+  policy:
+    max_tokens_per_run: 5000
+    require_human_before: [destructive]

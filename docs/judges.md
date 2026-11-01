@@ -9,7 +9,7 @@ kind: Artifact
 metadata: { name: refund-reply-quality, version: 2 }
 spec:
   type: judge
-  model: default                           # AgentModel or LiteLLM id; pinned in tuvl.lock
+  model: default                           # AgentModel or provider/model id; pinned in tuvl.lock
   rubric: |
     The reply must state the refund amount and timeline and must not promise
     anything outside the refund policy.
@@ -28,7 +28,7 @@ A verdict is always `{ verdict, score, reasons }`.
 | Site | On `fail` | On `uncertain` or judge unavailable |
 |---|---|---|
 | `guardrails.output` (llm, loop) | `guardrail_violation` | **Fails closed:** `error` (`judge_unavailable` / `judge_uncertain`) |
-| `Test.expect.judge` | The test fails | The test fails (`tuvl test --allow-uncertain` relaxes it) |
+| `Test.expect.judge` | The test fails | The test fails (`tuvl run tests --allow-uncertain` relaxes it) |
 | Loop `supervisor.judge` | `on_violation` (pause / abort / steer) | `on_judge_error` (ignore / pause / abort); rules still apply |
 
 ```yaml
@@ -44,8 +44,8 @@ expect:
    before any judge. Prefer a TEL assertion over a judge wherever the check is exact.
 2. **Verdict cache.** Verdicts are cached in `.tuvl/judge-cache/` by subject, judge version and
    content hash, so CI re-runs are deterministic and free. Commit the cache to share it.
-3. **Calibration.** `tuvl test` runs each judge's calibration set before first use. Agreement below
-   `min_agreement` marks its verdicts untrusted (V023 warning; `tuvl test --strict` fails).
+3. **Calibration.** `tuvl run tests` runs each judge's calibration set before first use. Agreement below
+   `min_agreement` marks its verdicts untrusted (V023 warning; `tuvl run tests --strict` fails).
 4. **Pinned.** The judge's model is recorded in `tuvl.lock`.
 
 ## Building the calibration set in Insight

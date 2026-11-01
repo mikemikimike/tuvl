@@ -1,0 +1,149 @@
+{
+  "requestBody": {
+    "content": {
+      "application/json": {
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "body": {
+              "title": "Body",
+              "type": "string"
+            },
+            "customer_email": {
+              "title": "Customer Email",
+              "type": "string"
+            },
+            "subject": {
+              "title": "Subject",
+              "type": "string"
+            }
+          },
+          "required": [
+            "subject",
+            "body",
+            "customer_email"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    "required": true
+  },
+  "responses": {
+    "200": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "description": "END.dismissed"
+    },
+    "201": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "category": {
+                "enum": [
+                  "billing",
+                  "technical",
+                  "account"
+                ],
+                "type": "string"
+              },
+              "id": {
+                "anyOf": [
+                  {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "urgency": {
+                "enum": [
+                  "low",
+                  "high"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "category",
+              "urgency"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "description": "END"
+    },
+    "202": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "approval": {
+                "type": "object"
+              },
+              "current_agent": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "run_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "workflow": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "run_id",
+              "status"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "description": "The run outlived sync_timeout or waits on a person or approval"
+    },
+    "422": {
+      "content": {
+        "application/json": {
+          "schema": {
+            "properties": {
+              "error": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "error"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "description": "END.failed"
+    }
+  },
+  "x-tuvl-workflow": "triage_ticket"
+}

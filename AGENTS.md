@@ -10,10 +10,10 @@ project) and `docs/tuvl-agentic-manual.md`.
 | Path | What |
 |---|---|
 | `src/tuvl/contract/` | The 2.0 document model: `schema.py` (Pydantic for Workflow, Test, TaskPlan, artifacts), `types.py` (type language), `tel.py` (expression language), `registry.py`, `surface.py` (input/end schemas for OpenAPI and MCP) |
-| `src/tuvl/validate/` | `tuvl validate`: per-engine signals, data flow, types, policy, profiles; rule codes in `codes.py` (V001–V026) |
-| `src/tuvl/runtime/` | The durable runner (`runner.py`), queue and leases (`queue.py`), journal (`journal.py`), host (`host.py`), engines (`code.py`, `tool.py`, `llm.py`, `decide.py`, `decision.py`, `loop.py`, `human.py`), judges, dev controls (`devtools.py`) |
-| `src/tuvl/api/` | REST: triggers, runs/events/approvals (`runs.py`), auth helpers, MCP export (`mcp_export.py`), the dev API for Insight (`dev.py`) |
-| `src/tuvl/spec/`, `codegen/`, `lock/`, `testing/`, `devmcp/` | Spec analysis and status, codegen, `tuvl.lock`, the offline test runner, `tuvl mcp` |
+| `src/tuvl/validate/` | `tuvl lint project`: per-engine signals, data flow, types, policy, profiles; rule codes in `codes.py` (V001–V043); workflow rules are the package `workflow/` (one module per area: `engines`, `flow`, `expressions`, `policy`, `profile`, `topology`) |
+| `src/tuvl/runtime/` | The durable runner (`runner.py`), queue and leases (`queue.py`), journal (`journal.py`), host (`host.py`), SSE wakeup (`wakeup.py`), MCP session pool (`mcp_pool.py`), engines (`code.py`, `tool.py`, `llm.py`, `decide.py`, `decision.py`, `loop.py`, `human.py`, `map.py`, `parallel.py`), judges, dev controls (`devtools.py`) |
+| `src/tuvl/api/` | REST: triggers, runs/events/approvals (`runs.py`), auth helpers, MCP export (`mcp_export.py`), the dev API for Insight (the package `dev/`, one router module per area; `GET /dev/project/summary` is the project summary, `/dev/project` the record) |
+| `src/tuvl/spec/`, `codegen/`, `lock/`, `testing/`, `devmcp/` | Spec analysis and status, codegen, `tuvl.lock`, the offline test runner, `tuvl serve mcp` |
 | `src/tuvl/cli/` | Typer commands; `--json` shapes in `cli/json_output.py` |
 | `src/tuvl/core/` | Carried-forward platform: config, models/loader, datasources, auth/IAM (Ed25519 JWT), artifacts, telemetry, tenancy |
 | `src/tuvl/skills/` | Package-data skills + `AGENTS.md` scaffolded into projects |
@@ -23,28 +23,29 @@ project) and `docs/tuvl-agentic-manual.md`.
 
 ## 2. Invariants
 
-- **Closed sets.** Engines: `pending code tool decide llm loop human`. Document kinds and artifact
+- **Closed sets.** Engines: `pending code tool decide llm loop human map parallel`. Document kinds and artifact
   types are listed in the manual. Never add one without changing the spec, the schema, validate,
   codegen, Insight and the docs together.
 - **The YAML is the single source of truth.** Insight and coding agents edit the same files; Insight
   edits keep comments (`yaml` Documents).
-- **Contracts are enforced twice:** statically by `tuvl validate` and at runtime by the runner
+- **Contracts are enforced twice:** statically by `tuvl lint project` and at runtime by the runner
   (outputs validated against the contract → `contract_violation`).
 - **Durability:** run state lives in Postgres (`tuvl_system_*` tables); nothing is kept only in
   worker memory. Per-agent writes commit with the checkpoint.
 - **No silent fallbacks** (e.g. an unavailable decision model is `error`, never rules or a default);
   guardrail judges fail closed.
-- **Dev surfaces are dev-only:** `/dev/*`, Insight, `tuvl mcp`, breakpoints and step mode never run
+- **Dev surfaces are dev-only:** `/dev/*`, Insight, `tuvl serve mcp`, breakpoints and step mode never run
   with `TUVL_ENV=production`.
 - **Security:** Ed25519-signed JWTs; workflow triggers default-deny (`public: true` opt-in); scopes per
   `docs/auth.md`; `secure: true` fields never reach models, logs or exports.
 
 ## 3. Working on the code
 
-- Python 3.13, `uv`. Run tests with Postgres: `TUVL_TEST_PG_URL=postgresql+asyncpg://… uv run pytest`.
+- Python 3.13 or 3.14, `uv`. Run tests with Postgres: `TUVL_TEST_PG_URL=postgresql+asyncpg://… uv run pytest`.
   Tests that need Postgres skip without it.
-- Before pushing: `make check` (ruff format + lint on `src/`) and `make typecheck-gate` (mypy on the
-  gated packages, which must stay clean). Format and fix only files you touched.
+- Before pushing: `make check` (ruff format + lint on `src/`) and `make typecheck` (mypy on all of `src/`, which must
+  stay clean). Format and fix only files you touched.
+- Performance: `uv run python scripts/bench_steps.py` (a disposable Postgres database in `TUVL_TEST_PG_URL`: it drops and recreates the runtime tables; local stub model server) prints runs/s, steps/s, step latency and SQL statements per step; run it before and after a change to the runner, journal or engines.
 - UI: `cd ui && pnpm exec tsc -b && pnpm test`; browser tests with `scripts/insight-smoke.sh`.
 - Keep comments minimal: only the non-obvious *why*. No narration or patch history.
 - Update `CHANGELOG.md` (the `[2.0.0]` section) and the relevant `docs/` page with any user-visible
@@ -55,6 +56,6 @@ project) and `docs/tuvl-agentic-manual.md`.
 ```bash
 uv run tuvl init demo --sample -y        # a project that passes the CI gate
 uv run tuvl dev -d demo --auto-login     # Insight at http://localhost:8885/insight
-uv run tuvl validate -d demo --strict --json
+uv run tuvl lint project -d demo --strict --json
 uv run pytest tests/runtime -q
 ```

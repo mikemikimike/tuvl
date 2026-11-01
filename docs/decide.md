@@ -38,7 +38,7 @@
 | No rule matches, model **unavailable** (down, auth, timeout after retries) | `error` (`decision_model_unavailable`). **Never** a fallback to rules, a default or another model |
 | `shadow: true` | Rules decide (`no_rule_matched` if none matches). The model runs every time; its answer is journaled for comparison and its failures are logged, not errors |
 
-Rules are TEL conditions over the agent's inputs, type-checked by `tuvl validate`. The output enum
+Rules are TEL conditions over the agent's inputs, type-checked by `tuvl lint project`. The output enum
 must equal the set of normal route keys, and every `then` must be one of its values (V012). A rule
 `{ when: "true", then: x }` at the end is the usual default.
 
@@ -53,7 +53,7 @@ kind: AgentModel
 metadata: { name: triage-classifier }
 spec:
   type: decision
-  provider: litellm                      # laya | jev | litellm
+  provider: llm                          # laya | jev | llm
   model: gemini/gemini-3.1-flash-lite    # pinned in tuvl.lock
 ```
 
@@ -69,15 +69,18 @@ metadata: { name: laya }
 spec:
   type: decision
   provider: laya
-  model: auto                            # auto | english | multilingual | typed-decisions
+  model: english                         # english | auto | multilingual | typed-decisions
   api_base: ${LAYA_API_BASE:http://localhost:8000}
   api_key: ${LAYA_API_KEY:}              # optional; must be an ${ENV_VAR} reference
 ```
 
-- **Laya** is self-hosted: the `laya-serve` image serves it on CPU with its weights pinned and
-  verified, so the image version is what pins the model. `model: auto` lets Laya route by
-  language (English or multilingual); `tuvl init --decision-model laya` scaffolds this model, a
-  `compose.yaml` for local development, and `tuvl ship` adds Laya to the Helm chart.
+- **Laya** is self-hosted: the [`tuvl/laya-serve`](https://hub.docker.com/r/tuvl/laya-serve) image
+  ([source](https://github.com/tuvl-io/laya-serve)) serves it on CPU, amd64 or arm64, with its
+  weights pinned and verified, so the image version is what pins the model. `model: english` runs
+  the English-only `-en` image (about 2 GiB of memory); `model: auto` routes by language and
+  `multilingual` need the full image (about 3.5 GiB), because an `-en` image fails on non-English
+  text. `tuvl init --decision-model laya` scaffolds an `english` model and a `compose.yaml` for
+  local development, and `tuvl ship` adds Laya to the Helm chart with the image that matches `model`.
 - **Jev** is TypeSafe's hosted service: set `api_base` to its endpoint and pin `model` to a version
   (`jev-1.13.0`); an unpinned Jev model is a V026 warning.
 - Confidence thresholds do not transfer between Laya and Jev (or between checkpoints) — calibrate
@@ -85,21 +88,21 @@ spec:
 
 ### OpenAI-compatible endpoints
 
-A decision model behind an OpenAI-compatible endpoint (a LiteLLM proxy, a self-hosted classifier)
-connects through `provider: litellm`:
+A decision model behind an OpenAI-compatible endpoint (a gateway, a self-hosted classifier)
+connects through `provider: llm`:
 
 ```yaml
 kind: AgentModel
 metadata: { name: hosted-classifier }
 spec:
   type: decision
-  provider: litellm
-  model: openai/my-classifier            # LiteLLM's OpenAI-compatible route
+  provider: llm
+  model: openai/my-classifier            # the OpenAI-compatible route
   api_base: ${CLASSIFIER_API_BASE}
   api_key: ${CLASSIFIER_API_KEY}         # must be an ${ENV_VAR} reference
 ```
 
-- `litellm` asks the model for `{"decision": <one of the choices>, "confidence": <0..1>}` as
+- `llm` asks the model for `{"decision": <one of the choices>, "confidence": <0..1>}` as
   structured output. An `llm`-type AgentModel can also be referenced directly; it uses the same
   adapter.
 - **Where the confidence comes from.** A `type: decision` model's reported `confidence` is used

@@ -1,4 +1,4 @@
-.PHONY: help setup setup-all setup-min dev-core dev-ui install install-dev lint fmt check typecheck typecheck-gate test test-verbose build-ui build smoke publish publish-dry clean ui-install
+.PHONY: ui-notices bump check-version help setup setup-all setup-min dev-core dev-ui install install-dev lint fmt check typecheck test test-verbose build-ui build smoke publish-dry clean ui-install
 
 PYTHON := uv run python
 RUFF   := uv run ruff
@@ -18,15 +18,13 @@ help:
 	@echo "  lint         Run ruff check"
 	@echo "  fmt          Run ruff formatter"
 	@echo "  check        Run ruff check + ruff format check (CI gate)"
-	@echo "  typecheck      Run mypy over the whole repo (advisory — not a CI gate yet)"
-	@echo "  typecheck-gate Run mypy over the known-clean subset (fails on regression)"
+	@echo "  typecheck      Run mypy over src/ (a CI gate)"
 	@echo "  test         Run the pytest suite (quiet)"
 	@echo "  test-verbose Run the pytest suite (verbose)"
 	@echo "  build-ui     Compile React SPA and copy assets into tuvl-insight wheel"
 	@echo "  build        build-ui → build tuvl wheel → build tuvl-insight wheel"
 	@echo "  smoke        build → install both wheels in /tmp venv → verify tuvl --version + insight static assets"
-	@echo "  publish-dry  smoke → list what would be uploaded (no actual push)"
-	@echo "  publish      smoke → upload both wheels + sdists to PyPI (set UV_PUBLISH_TOKEN)"
+	@echo "  publish-dry  smoke → list the artefacts a release would carry (CI publishes)"
 	@echo "  clean        Remove build artifacts"
 
 # ── Install ───────────────────────────────────────────────────────────────────
@@ -78,42 +76,14 @@ fmt:
 	$(RUFF) check src/ --fix
 	$(RUFF) format src/
 
-# `check` is the CI lint gate — ruff + format only.  mypy has a large backlog
-# of pre-existing errors flagged by the code-quality audit (chiefly in the
-# SQLModel dynamic-class code paths) and is *not*
-# treated as a release blocker.  Run ``make typecheck`` separately to see
-# the current type debt; clean it down between releases.
+# `check` is the CI lint gate (ruff + format); `typecheck` is mypy over all of src/, also a gate.
 check:
 	$(RUFF) check src/ tests/ --output-format=concise
 	$(RUFF) format --check src/ tests/
 
 typecheck:
-	@echo "→ mypy (advisory, full repo — not currently a CI gate)"
-	$(MYPY) src/ || true
-
-# Modules that are currently mypy-clean.  This is a ratchet, not a wall: it
-# must stay green.  When you clean up a new module, add it here so it can't
-# silently regress; never remove an entry to make room for new errors.
-MYPY_GATED_PATHS := \
-  src/tuvl/api \
-  src/tuvl/testing \
-  src/tuvl/spec \
-  src/tuvl/codegen \
-  src/tuvl/lock \
-  src/tuvl/devmcp \
-  src/tuvl/contract \
-  src/tuvl/validate \
-  src/tuvl/runtime \
-  src/tuvl/tenancy \
-  src/tuvl/cli/main.py \
-  src/tuvl/core/system_config.py \
-  src/tuvl/core/context.py \
-  src/tuvl/core/config_loader.py \
-  src/tuvl/core/errors.py
-
-typecheck-gate:
-	@echo "→ mypy (gated subset — must pass, no || true)"
-	$(MYPY) $(MYPY_GATED_PATHS)
+	@echo "→ mypy (all of src/ — must pass)"
+	$(MYPY) src/
 
 # ── Test ──────────────────────────────────────────────────────────────────────
 test:
@@ -136,6 +106,20 @@ build: build-ui
 	$(UV) build --package tuvl-insight --out-dir dist/
 	@echo "✓ Both wheels ready in dist/"
 
+# ── Versioning ───────────────────────────────────────────────────────────────
+# tuvl and tuvl-insight release in lockstep; `make bump` sets the version in every file that
+# carries it and refreshes uv.lock. `make check-version` fails when they disagree.
+# Regenerate the third-party license notices that ship inside tuvl-insight.
+ui-notices:
+	$(PYTHON) scripts/gen_ui_notices.py
+
+bump:
+	@test -n "$(VERSION)" || { echo "usage: make bump VERSION=2.0.1"; exit 2; }
+	$(PYTHON) scripts/bump_version.py $(VERSION)
+
+check-version:
+	$(PYTHON) scripts/bump_version.py --check
+
 # ── Pre-publish smoke ────────────────────────────────────────────────────────
 # Install the *actual* artefacts we're about to publish into a throwaway venv
 # and prove three things before we ship them to PyPI:
@@ -148,7 +132,7 @@ build: build-ui
 #      exists in the installed package directory.
 #
 # This mirrors the `Smoke-test built wheel` step in `.github/workflows/publish.yml`
-# and runs locally before `make publish` so we never push a broken artefact.
+# and runs locally before tagging a release so we never ship a broken artefact.
 smoke: build
 	@echo "→ Smoke-testing built wheels in a throwaway venv..."
 	@PYPROJECT_VERSION=$$(grep '^version' pyproject.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/'); \
@@ -174,39 +158,12 @@ print(f"  tuvl_insight static/: {p.parent} ({len(list(p.parent.iterdir()))} file
 	  rm -rf /tmp/tuvl-publish-smoke
 	@echo "✓ Smoke test passed"
 
-# ── Publish ──────────────────────────────────────────────────────────────────
-# publish requires `smoke` (which requires `build`) to pass first so we never
-# upload an artefact we haven't proven importable.  Smoke also enforces the
-# pyproject ↔ `tuvl --version` match.
-#
-# Both .whl AND .tar.gz are uploaded so the sdist is available as a fallback
-# for systems that can't use the platform-independent wheel.  Engine first,
-# then tuvl-insight (which has `tuvl>=...` as a hard dep, so it must follow).
-#
-# Set UV_PUBLISH_TOKEN to a PyPI API token before running:
-#   export UV_PUBLISH_TOKEN=pypi-XXXX
-publish: smoke
-	@if [ -z "$$UV_PUBLISH_TOKEN" ]; then \
-	  echo "::error:: UV_PUBLISH_TOKEN not set. Generate a token at"; \
-	  echo "          https://pypi.org/manage/account/token/  then run:"; \
-	  echo "          export UV_PUBLISH_TOKEN=pypi-..."; \
-	  exit 1; \
-	fi
-	@PYPROJECT_VERSION=$$(grep '^version' pyproject.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/'); \
-	  echo "→ Publishing tuvl $$PYPROJECT_VERSION to PyPI (wheel + sdist)..."; \
-	  $(UV) publish dist/tuvl-$$PYPROJECT_VERSION-py3-none-any.whl dist/tuvl-$$PYPROJECT_VERSION.tar.gz; \
-	  echo "→ Publishing tuvl-insight $$PYPROJECT_VERSION to PyPI (wheel + sdist)..."; \
-	  $(UV) publish dist/tuvl_insight-$$PYPROJECT_VERSION-py3-none-any.whl dist/tuvl_insight-$$PYPROJECT_VERSION.tar.gz
-	@echo "✓ Both packages published"
-	@echo ""
-	@echo "Verify on PyPI:"
-	@echo "  https://pypi.org/project/tuvl/"
-	@echo "  https://pypi.org/project/tuvl-insight/"
+# Publishing is CI only (.github/workflows/publish.yml, PEP 740 attestations); there is no local publish target.
 
-# ── Publish dry-run — what would be uploaded without actually pushing ──────
+# ── Release artefact listing ──────────────────────────────────────────────────
 publish-dry: smoke
 	@PYPROJECT_VERSION=$$(grep '^version' pyproject.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/'); \
-	  echo "→ Dry-run — would publish these to PyPI:"; \
+	  echo "→ Artefacts a release would carry:"; \
 	  ls -la dist/tuvl-$$PYPROJECT_VERSION* dist/tuvl_insight-$$PYPROJECT_VERSION*
 
 # ── Clean ─────────────────────────────────────────────────────────────────────

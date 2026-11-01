@@ -48,6 +48,23 @@ def test_token_without_ttl_has_no_expiry() -> None:
     assert "exp" not in decode_token(mint_token("usr-3", [], [], ttl_seconds=None))
 
 
+def test_iat_is_never_in_the_future(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A clock reading of x.9996 must not round iat up past "now" (jwt.decode rejects a future iat)."""
+    import time as _time
+
+    real = _time.time()
+    fixed = int(real) + 0.9996
+    monkeypatch.setattr("tuvl.core.auth.token.time.time", lambda: fixed)
+    token = mint_token("usr-4", [], [])
+    assert jwt_iat(token) <= fixed
+
+
+def jwt_iat(token: str) -> float:
+    import jwt
+
+    return float(jwt.decode(token, options={"verify_signature": False})["iat"])
+
+
 # ── Phase 1.5 — verify_token fails closed ─────────────────────────────────────
 
 

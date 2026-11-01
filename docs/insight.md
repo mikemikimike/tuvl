@@ -1,80 +1,53 @@
 # Insight
 
-Insight is tuvl's browser UI for building and debugging a project. It is served by `tuvl dev`
-(dev mode only) at `/insight`, talks to the server over REST and SSE, and edits the **same YAML
-files** as your editor and coding agents — there is no separate canvas model.
+Insight is tuvl's browser editor for a project. It reads and writes the same files the CLI does, so anything you do in it
+is a change to YAML in git, and anything you change in git shows up in it. Specs, tasks, the workflow canvas, runs, models and
+settings are in one place.
 
 ```bash
-tuvl dev                 # http://localhost:8885/insight — asks for the session key
-tuvl dev --auto-login    # skip the key screen on this machine
+tuvl dev --auto-login        # Insight at http://localhost:8885/insight (needs tuvl[standard])
 ```
+
+It is a development tool: a production server (`tuvl serve app`) has no Insight and no dev routes. On a terminal `tuvl dev` also
+starts a [terminal UI](cli.md#servers) that runs the same commands.
 
 ## Pages
 
-| Page | What it does |
+| Page | What you do there |
 |---|---|
-| **Specs** | Every spec is a tile across the top (task progress, stale/blocked markers, a ✗ badge for blocking `spec check` findings); click one to show it below, double-click (or **Open spec**) to edit it in its own window, with `spec check` findings inline — saving there refreshes the page. Below: **Tasks** (the coding agent's task list, statuses derived), **Findings** (blocking, warnings, waivers, unchecked prose) and **Traceability** (`spec verify`: step → agent ✓ / pending / mismatch → the tests that run it, each example's test result with why; a step opens its node on the canvas, and the canvas links back) |
-| | On the canvas, **Run** / **Step** are disabled while a model the workflow uses isn't configured (`/health` → `tuvl doctor`) |
-| **Workflows** | Canvas and YAML editor for each workflow (below) |
-| | A `code` agent's **Engine** tab is a Python editor for `agents/<file>.py` (⤢ full screen, ⌘S / **Save Python**). Saving is syntax-checked, normalized by codegen (decorator, signature and docstring come from the contract; your body is kept) and reloads the agent. **✦ Assist** writes or changes the body with one of the project's LLM AgentModels: it is given the agent's contract, the fields of its models and the `agent-code` rules, returns the whole file into the editor (↶ undo) and saves nothing; unconfigured models are disabled |
-| **Runs** | Live and past runs, journal timeline per agent (loop turns, tool calls, decisions, judge verdicts), approvals inbox with forms and tool-call approve/edit/reject, pause/resume/abort/steer, start a run, pin a run as a fixture, replay fixtures (SAME/DIFF) |
-| **Artifacts** | Prompts, steering, skills, guardrails, hooks, MCP servers; **judge editor** with try/calibrate; **rules editor** with "which rule matches" |
-| **Models**, **Datasources**, **Embeddings**, **Collections** | Data configuration |
-| **AI Models** | `AgentModel`s — LLM (LiteLLM id, base URL, key reference, parameters) or **Decision** (provider `laya`/`jev`/`litellm` + model) |
-| **IAM**, **Federation**, **Settings**, **API Docs** | Users and roles, OAuth providers, system settings (incl. the CRUD kill switch), OpenAPI |
+| **Specs** | A tile per spec with its status. Open a spec to read it, see its **Findings** (the rules `tuvl lint spec` applies) and **Traceability** (step, agent, tests), approve, send back or reopen it, derive its tasks, and open a task in a panel you can drag and pop out. **Graph** draws the tasks in execution order; a blocked task says why |
+| **Ideas** | The numbered, immutable ideas of the project and the specs generated from each. **Upload idea** takes files, a folder, links (a web page, Jira issue, Confluence page or GitHub issue) or pasted text and makes what `tuvl import idea` makes. **Generate a spec with my agent** runs `tuvl generate spec --idea` with the coding agent you selected, after asking for consent the first time |
+| **Workflows** | A canvas over the workflow YAML (the YAML toggle shows the file itself). **+ Add step** (or `A`) adds an agent from a palette of presets, including **Retrieve and answer**, which adds a collection search routed into an answering model. Select an agent to edit it in the side panel; run a workflow with breakpoints and step mode, and check a change of engine before applying it |
+| **Runs** | Every run with its journal, cost and approvals, live over SSE |
+| **Artifacts** | Prompts, steering, skills, guardrails, hooks, MCP servers, judges and decision tables, with their versions and what uses them |
+| **Models** | Data models: fields, relations, access and the CRUD operations exposed |
+| **AI Models** | The model presets (`llms/`) agents refer to as `model: default`, with provider and key variable |
+| **Embeddings**, **Collections** | The vector search setup that `tuvl.data_search`, `tuvl.data_ingest` and a loop's `collection:` tool use. A banner appears when pgvector is not available |
+| **Memory** | What agents remember across runs, per collection: the owners, each memory with the agent and run that wrote it, a filter by owner, and **Forget** for one memory or (after a second click) everything of one owner. Reads and deletes through the dev API; `tuvl prune memory` does the same from the command line |
+| **Datasources**, **Storage** | PostgreSQL, Redis and blob stores; a store can be checked (write, read back, delete a probe object) and its objects browsed from the page |
+| **IAM**, **Federation** | Users, roles, scopes and groups; Google, GitHub, Microsoft or custom sign-in providers |
+| **API Docs** | The OpenAPI generated from your workflows' contracts |
+| **Audit** | The local audit ledger and, when developer telemetry is on, the **Team** view of what everyone did |
+| **Settings** | API access (which routes the production server exposes), developer telemetry, the project's identity and its listing in Nest |
 
-## Workflows: the canvas
+## The agent panel
 
-- **Start card**: trigger (HTTP path/method/public, schedule, MCP export) and the typed input.
-- **Agent cards**: engine, determinism class, `id`, description, input/output contract, budget and
-  retry chips, one outlet per routable signal. Red ports mark inputs not produced upstream.
-- **End cards**: one per named output, with status and body.
-- **Palette**: Deterministic (Code, Database op, HTTP call, MCP tool, Vector search, Vector ingest),
-  AI (LLM call, Autonomous loop), Control (Decide, Human approval), Contract only (Pending agent). A new
-  agent is wired after the selected one when that one ended the workflow.
-- **Panel tabs**: Contract (fields with type suggestions and upstream outputs) · Engine (rules table
-  for decide, a YAML block editor per engine) · Budget · Governance · Routes · Probe (run this one
-  agent with hand-entered inputs).
-- **Summary bar**: determinism profile, worst-case tokens and live validation of the draft; a
-  data-flow overlay draws each output key to its consumers.
-- Canvas and YAML tabs edit the same text (comments are kept); node positions are stored in
-  `.tuvl/layout/<workflow>.json`. **Save** writes the file; **Discard** drops the draft.
+Selecting an agent on the canvas opens a panel with these tabs:
 
-### Run, debug, pin
+| Tab | Holds |
+|---|---|
+| **Engine** (named **Rules**, **Prompt**, **Loop**, **Tool**, **Approval** by engine) | The engine's own settings. An `llm` or `loop` agent also has **Remember across runs**: the memory collection, whose memory (the signed-in user, the tenant or an input), how many recent and related memories, the prompt budget, what is stored and how long it is kept. An `llm` or `loop` agent picks its **AI model** from the configured presets (or types a `provider/model` id), and writes its system prompt, prompt or steering in place or takes it from a stored artifact pinned to a version; skills, MCP servers and collections it may search are listed here too. A `tuvl.data_search` or `tuvl.data_ingest` step picks its **collection** |
+| **Contract** | The agent's typed inputs and outputs |
+| **Routes** | Where each signal goes |
+| **Budget** | Tokens, time and iterations |
+| **Probe** | Run this one agent alone, live, with inputs you type (an `llm` or `loop` agent spends real tokens; save the workflow first) |
+| **YAML** | The whole agent as it is in the workflow file, editable; its id cannot change here because routes point at it |
+| **Governance** | Effect, guardrails, hooks and the compensating agent |
 
-- **▶ Run** starts a dev run with an input form; **⏯ Step** pauses before every agent and every loop
-  tool call.
-- Click a card's dot to set a **breakpoint** (`.tuvl/breakpoints.json`): dev runs pause before that
-  agent. While paused, the Runs page shows the agent's input view; edit it and **Continue**.
-- **📌 Pin as fixture** on a finished run writes `tests/fixtures/<workflow>/<name>.journal.json`.
+A code agent also has a **Code** tab with the Python of its function.
 
-### Change engine
+## What Insight does not do
 
-**Change engine…** swaps an agent's engine and keeps its id, inputs, outputs and routes (the
-signals of a code agent become the decision enum when switching to decide). Then:
-
-- **⇄ Check vs fixtures** replays the workflow's pinned fixtures against the **unsaved draft**, with
-  only that agent executing and everything else served from the recording — SAME/DIFF per fixture,
-  plus the validate profile before and after;
-- **⌘ Generate stub** runs codegen when the new engine is `code`.
-
-Breakpoints and step mode never apply to these replays or to `tuvl test`.
-
-## Artifacts: judges and rules
-
-- **Judge** — model, rubric, `min_score`, `min_agreement`. **Try**: paste a subject, ask the judge
-  (live, using the draft), then mark the verdict ✓ right / ✗ wrong with a label to add it to the
-  calibration set (`fixtures/judge/<label>.json`). **Calibration**: run the set and see agreement.
-  See [judges](judges.md).
-- **Rules** — an ordered `when → then` table (edit, reorder, add, remove) and a context box that
-  shows which rule matches.
-- **+ New artifact** creates prose artifacts, or judge/rules YAML from a template.
-
-Saving a YAML file reloads the dev server; Insight picks the change up when it is back.
-
-## Dev API
-
-Insight uses `/dev/*` (dev mode only, behind the session key; in dev mode the key is also an
-`iam:admin` token for `/api/*`): project summary, raw text files per area, validate (also for a
-draft), schema, codegen, tests, specs, layout, breakpoints, runs (start, context, pin, replay),
-agent probe, change check, judges and rules. The OpenAPI at `/docs` lists them.
+- It does not hold state of its own: close it and nothing is lost, because everything is in the files.
+- It does not run in production, and it cannot see a deployed server's data.
+- It spends tokens only where you ask a model or a coding agent to: checking a spec, deriving tasks and linting are free.

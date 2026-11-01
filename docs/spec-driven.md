@@ -19,8 +19,8 @@ spec (.md) ──spec check──▶ checked spec ──coding agent (skills)─
 
 A spec is Markdown. Prose sections (`# Intent`, `# Policies`, anything else) are for people and the
 coding agent. Three sections are **structured** and checked: `# Data`, `# Flows` and the
-`tuvl-example` blocks under `# Acceptance`. `tuvl spec new refund-request` writes a template that
-passes `tuvl spec check`.
+`tuvl-example` blocks under `# Acceptance`. `tuvl create spec refund-request` writes a template that
+passes `tuvl lint spec`.
 
 ~~~markdown
 ---
@@ -78,14 +78,14 @@ expect: { end: default }
 | Engines | `code` · `tool db read\|list\|create\|update\|upsert\|delete <Model>` · `tool http <METHOD> <name>` · `tool mcp <server>` · `llm <model>` · `loop <model>` (with `` tools: `t1`, workflow `w` (approval <group> when `expr`; max 1 call) ``) · `decide rules` · `decide model <ref> ≥ 0.8` · `decide rules + model <ref> ≥ 0.7` · `human group <g>` |
 | Route | `` - signal[, signal] → `step` `` or `→ END` / `→ END.<end>`; `(out `f` (type))` names outputs a reserved signal carries |
 | Rule | `` - `TEL condition` → value ``, last `- otherwise → value` |
-| Waiver | `- <signal>: waived — <reason>` under a step; `- tests: waived — <reason>` for a step no offline test can run (e.g. it needs pgvector) — reported by `spec verify`, counted by task status; `   - <end>: no example — <reason>` (indented) under `Ends:` |
+| Waiver | `- <signal>: waived — <reason>` under a step; `- tests: waived — <reason>` for a step no offline test can run (e.g. it needs pgvector) — reported by `verify spec`, counted by task status; `   - <end>: no example — <reason>` (indented) under `Ends:` |
 | Off-spine | `T1.` steps — a loop's tools (`tool of `loop``), compensators (a step's `` · compensate `undo_x` `` part: runs on a rollback end to undo it) and alternate paths, which route `default` explicitly |
 
 Implicit: `default` goes to the next numbered step (or `END`), and `error` to `END.failed`.
 
 ## 2. Check it
 
-`tuvl spec check [SPEC] [--strict] [--json]` (MCP `spec_check`, `GET /dev/specs/check`) — zero
+`tuvl lint spec [SPEC] [--strict] [--json]` (MCP `spec_check`, `GET /dev/specs/check`) — zero
 tokens, deterministic. It reports every finding with its line; blocking findings fail.
 
 | Rule | | Finding |
@@ -106,13 +106,18 @@ tokens, deterministic. It reports every finding with its line; blocking findings
 | S014 | ! | A free-text acceptance bullet — listed, not checked |
 | S015 | ✗ | A `decide` rule doesn't compile or type-check against the step's inputs, reads a non-input, or yields a value outside the output enum |
 | S016 | ✗ | A loop tool isn't a `T` step of the flow (or a `## Flow:`/project workflow), an approval condition doesn't compile, or an off-spine step is never used |
+| S017 | ✗ | The spec is `approved` but its body changed since: approve it again (`tuvl approve spec`) or reopen it |
+| S018 | ✗ | `ideas:` names an idea that is not in `idea/` |
+| S019 | ! | The spec `id` is malformed, differs from the file name, or its idea is missing from `ideas:` |
+| S020 | ! | An idea the spec comes from was superseded by a newer one |
+| S021 | ! | A file of an idea changed (or went missing) since it was imported — ideas are immutable |
 | T001 | ! | An example mocks deterministic logic (`code`, `tool db`, `decide` rules) — seed `given:` and `as:` instead |
 
 Prose sections are listed as *unchecked*. A waived signal or end is reported (·) so a reviewer sees it.
 
 ## 3. Verify the implementation
 
-`tuvl spec verify [SPEC] [--strict] [--no-tests] [--json]` (MCP `spec_verify`,
+`tuvl verify spec [SPEC] [--strict] [--no-tests] [--json]` (MCP `spec_verify`,
 `GET /dev/specs/verify`) — zero tokens. It compares each `## Flow:` with its workflow, each `# Data`
 model with its `ModelDefinition`, and runs the tests (offline) to see which steps they exercise.
 **Errors** are contradictions; **warnings** are unfinished work (a missing workflow, a `pending`
@@ -143,8 +148,17 @@ specs/triage-ticket.md
 
 ## 4. The task list
 
-The **coding agent writes the task list** (skill `tuvl-plan`) from the checked spec — tuvl doesn't
-plan with a model. tuvl checks it as part of `tuvl spec check` and derives each task's status.
+`tuvl generate tasks <spec>` **derives the task list** from an *approved* spec — one task per new model,
+step and example, a manual task for each step that calls an external system — with no model. Re-running
+it keeps ids, refreshes section hashes and marks tasks whose step or example left the spec `obsolete`.
+The coding agent (skill `tuvl-plan`) adds only what cannot be derived, such as a `manual` task for a
+policy or credentials. tuvl checks the list as part of `tuvl lint spec` and derives each task's status.
+
+A spec is a **draft** until someone runs `tuvl approve spec`, which records who, when and a hash of the
+body in the front matter (`status`, `approved_by`, `approved_at`, `approved_hash`). Editing the body
+afterwards makes the approval stale (S017) and the spec a draft again; the front matter is not hashed.
+`tuvl reject spec --reason` and `tuvl reopen spec` send it back. Anyone on the project may approve; the
+review of the commit that records it is the control. `tuvl list specs` shows each spec's state.
 
 ```yaml
 kind: TaskPlan
@@ -187,25 +201,25 @@ tasks for new steps and marks removed ones `obsolete: true` (never deletes them)
 | Status | Rule |
 |---|---|
 | `todo` | Target agent is `pending`, the target file is absent, or an example has no generated test |
-| `in_progress` | Target exists but validate reports errors on it, or it contradicts the spec (`spec verify`) |
+| `in_progress` | Target exists but validate reports errors on it, or it contradicts the spec (`verify spec`) |
 | `implemented` | Target validates cleanly and matches the spec |
 | `tested` | A passing `Test` covers it (stubbed results don't count), and its acceptance examples pass |
 | `done` | Nothing blocks `ship`: lock current, no warnings on the target |
-| `blocked` (overlay) | The spec has blocking `spec check` findings, or a `depends_on` task isn't `done` |
+| `blocked` (overlay) | The spec has blocking `lint spec` findings, or a `depends_on` task isn't `done` |
 | `stale` (overlay) | The spec section changed since the task was written |
 
 Only `type: manual` tasks take a manual status. Models and artifacts skip `tested`. A task tuvl can't
 measure is `untracked`.
 
 ```bash
-tuvl spec status --json     # derived statuses (runs the tests offline; --no-tests caps at implemented)
-tuvl spec status --strict   # exit 1 unless every live task is done and none is blocked or stale
-tuvl spec diff              # stale tasks and spec sections no task covers
+tuvl list tasks --json     # derived statuses (runs the tests offline; --no-tests caps at implemented)
+tuvl list tasks --strict   # exit 1 unless every live task is done and none is blocked or stale
+tuvl show drift              # stale tasks and spec sections no task covers
 ```
 
 ## 5. Codegen
 
-`tuvl codegen [<workflow>] [--check]` — deterministic, no model:
+`tuvl generate code [<workflow>] [--check]` — deterministic, no model:
 
 | Output | Rule |
 |---|---|
@@ -219,27 +233,27 @@ tuvl spec diff              # stale tasks and spec sections no task covers
 
 ## 6. Lock
 
-`tuvl lock` writes `tuvl.lock`: the tuvl version, each AgentModel's model id, each `artifact://`
+`tuvl generate lock` writes `tuvl.lock`: the tuvl version, each AgentModel's model id, each `artifact://`
 ref's version and sha256, judge and decision-model versions, and each allowed MCP tool's input-schema
-hash (listed live; `--no-mcp` compares by name only). `tuvl lock --check` verifies it; `tuvl ship`
+hash (listed live; `--no-mcp` compares by name only). `tuvl verify lock` verifies it; `tuvl ship`
 requires it (V024) and pins the locked tuvl version in the image.
 
 ## 7. The CI gate
 
 ```bash
-tuvl spec check && tuvl validate --strict && tuvl codegen --check && tuvl lock --check && tuvl test --strict && tuvl spec verify --strict && tuvl spec status --strict
+tuvl lint spec && tuvl lint project --strict && tuvl generate code --check && tuvl verify lock && tuvl run tests --strict && tuvl verify spec --strict && tuvl list tasks --strict
 ```
 
 `tuvl init <name> --sample` creates a project that passes this gate as created.
 
 ## Coding agents
 
-- `tuvl mcp [-d <project>] [--allow-write]` serves the same operations over MCP (stdio): `validate`,
+- `tuvl serve mcp [-d <project>] [--allow-write]` serves the same operations over MCP (stdio): `validate`,
   `spec_check`, `spec_verify`, `spec_status`, `spec_diff`, `get_contract`, `list_agents`,
   `explain_error`, `get_run`, `get_run_events`, `codegen`, `test`; with `--allow-write` also
   `codegen_write`, `run_workflow`, `pin_fixture`. It refuses `TUVL_ENV=production`.
-- `.agents/skills/` (refreshed by `tuvl skills update [--diff]`, mirrored to `.claude/skills/`):
+- `.agents/skills/` (refreshed by `tuvl update skills [--diff]`, mirrored to `.claude/skills/`):
   `tuvl-spec`, `tuvl-plan`, `tuvl-task-loop`, `agent-code`, `agent-tool`, `agent-llm`, `agent-loop`,
-  `agent-decide`, `agent-human`, `tuvl-data`, `tuvl-test`, `tuvl-harden`, `tuvl-ship`, plus a root
+  `agent-decide`, `agent-human`, `agent-map`, `agent-parallel`, `tuvl-data`, `tuvl-test`, `tuvl-harden`, `tuvl-ship`, plus a root
   `AGENTS.md` with the non-negotiable rules.
 - Every read command has `--json` with a documented schema (`/dev/schema/cli` in dev mode).

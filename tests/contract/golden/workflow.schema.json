@@ -1,0 +1,3594 @@
+{
+  "$defs": {
+    "AgentToolRef": {
+      "additionalProperties": false,
+      "properties": {
+        "agent": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Agent",
+          "type": "string"
+        },
+        "approval": {
+          "anyOf": [
+            {
+              "const": "required",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/ApprovalWhen"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        }
+      },
+      "required": [
+        "agent"
+      ],
+      "title": "AgentToolRef",
+      "type": "object"
+    },
+    "ApprovalWhen": {
+      "additionalProperties": false,
+      "properties": {
+        "required_group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Group"
+        },
+        "when": {
+          "description": "A TEL expression that must evaluate to a bool (\u00a76.2).",
+          "title": "When",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when"
+      ],
+      "title": "ApprovalWhen",
+      "type": "object"
+    },
+    "Budget": {
+      "additionalProperties": false,
+      "properties": {
+        "max_iterations": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Iterations"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        },
+        "max_tool_calls": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tool Calls"
+        },
+        "retry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RetryPolicy"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+(\\.\\d+)?(ms|s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout"
+        }
+      },
+      "title": "Budget",
+      "type": "object"
+    },
+    "CodeAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "code": {
+          "$ref": "#/$defs/CodeParams"
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "effect": {
+          "default": "write",
+          "enum": [
+            "read",
+            "write",
+            "destructive"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "engine": {
+          "const": "code",
+          "title": "Engine",
+          "type": "string"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "code"
+      ],
+      "title": "CodeAgent",
+      "type": "object"
+    },
+    "CodeParams": {
+      "additionalProperties": false,
+      "properties": {
+        "run": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+          "title": "Run",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "With",
+          "type": "object"
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "title": "CodeParams",
+      "type": "object"
+    },
+    "CollectionToolRef": {
+      "additionalProperties": false,
+      "description": "Search a collection: the model supplies the query, ``top_k`` and ``filter`` are fixed here.",
+      "properties": {
+        "approval": {
+          "anyOf": [
+            {
+              "const": "required",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/ApprovalWhen"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval"
+        },
+        "collection": {
+          "minLength": 1,
+          "title": "Collection",
+          "type": "string"
+        },
+        "filter": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Filter",
+          "type": "object"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "scope": {
+          "default": "global",
+          "enum": [
+            "global",
+            "run"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "top_k": {
+          "default": 5,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Top K",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "collection"
+      ],
+      "title": "CollectionToolRef",
+      "type": "object"
+    },
+    "DbTool": {
+      "additionalProperties": false,
+      "properties": {
+        "limit": {
+          "anyOf": [
+            {
+              "maximum": 10000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        },
+        "model": {
+          "pattern": "^[A-Z][A-Za-z0-9_]*$",
+          "title": "Model",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "create",
+            "read",
+            "update",
+            "delete",
+            "list",
+            "upsert"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "order_by": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Order By"
+        },
+        "use": {
+          "const": "db",
+          "title": "Use",
+          "type": "string"
+        },
+        "values": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Values"
+        },
+        "where": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Where"
+        }
+      },
+      "required": [
+        "use",
+        "model",
+        "op"
+      ],
+      "title": "DbTool",
+      "type": "object"
+    },
+    "DecideAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "decide": {
+          "$ref": "#/$defs/DecideParams"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "engine": {
+          "const": "decide",
+          "title": "Engine",
+          "type": "string"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "decide"
+      ],
+      "title": "DecideAgent",
+      "type": "object"
+    },
+    "DecideModel": {
+      "additionalProperties": false,
+      "properties": {
+        "min_confidence": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Min Confidence",
+          "type": "number"
+        },
+        "ref": {
+          "description": "AgentModel name (type decision or llm).",
+          "minLength": 1,
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ref",
+        "min_confidence"
+      ],
+      "title": "DecideModel",
+      "type": "object"
+    },
+    "DecideParams": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecideModel"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "rules": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/DecideRule"
+              },
+              "type": "array"
+            },
+            {
+              "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+              "type": "string"
+            }
+          ],
+          "default": [],
+          "title": "Rules"
+        },
+        "shadow": {
+          "default": false,
+          "title": "Shadow",
+          "type": "boolean"
+        }
+      },
+      "title": "DecideParams",
+      "type": "object"
+    },
+    "DecideRule": {
+      "additionalProperties": false,
+      "properties": {
+        "then": {
+          "maxLength": 64,
+          "pattern": "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$",
+          "title": "Then",
+          "type": "string"
+        },
+        "when": {
+          "description": "A TEL expression that must evaluate to a bool (\u00a76.2).",
+          "title": "When",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "then"
+      ],
+      "title": "DecideRule",
+      "type": "object"
+    },
+    "EndOutput": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "rollback": {
+          "default": false,
+          "title": "Rollback",
+          "type": "boolean"
+        },
+        "status": {
+          "default": 200,
+          "maximum": 599,
+          "minimum": 100,
+          "title": "Status",
+          "type": "integer"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/$defs/LongFormField"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Type"
+        }
+      },
+      "title": "EndOutput",
+      "type": "object"
+    },
+    "Guardrails": {
+      "additionalProperties": false,
+      "properties": {
+        "input": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Input",
+          "type": "array"
+        },
+        "output": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Output",
+          "type": "array"
+        },
+        "tools": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Tools",
+          "type": "array"
+        }
+      },
+      "title": "Guardrails",
+      "type": "object"
+    },
+    "HttpExpect": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "items": {
+            "maximum": 599,
+            "minimum": 100,
+            "type": "integer"
+          },
+          "title": "Status",
+          "type": "array"
+        }
+      },
+      "title": "HttpExpect",
+      "type": "object"
+    },
+    "HttpTool": {
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "expect": {
+          "$ref": "#/$defs/HttpExpect",
+          "default": {
+            "status": [
+              200,
+              201,
+              202,
+              204
+            ]
+          }
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Headers",
+          "type": "object"
+        },
+        "idempotency": {
+          "default": "none",
+          "enum": [
+            "auto",
+            "none"
+          ],
+          "title": "Idempotency",
+          "type": "string"
+        },
+        "map": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Declared output key \u2192 response path.",
+          "title": "Map",
+          "type": "object"
+        },
+        "method": {
+          "enum": [
+            "GET",
+            "HEAD",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "query": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Query",
+          "type": "object"
+        },
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "use": {
+          "const": "http",
+          "title": "Use",
+          "type": "string"
+        }
+      },
+      "required": [
+        "use",
+        "method",
+        "url"
+      ],
+      "title": "HttpTool",
+      "type": "object"
+    },
+    "HttpTrigger": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "method": {
+          "default": "POST",
+          "enum": [
+            "GET",
+            "POST",
+            "PUT",
+            "PATCH",
+            "DELETE"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "path": {
+          "pattern": "^/[A-Za-z0-9_\\-./{}]*$",
+          "title": "Path",
+          "type": "string"
+        },
+        "public": {
+          "default": false,
+          "title": "Public",
+          "type": "boolean"
+        },
+        "sync_timeout": {
+          "default": "30s",
+          "pattern": "^\\d+(\\.\\d+)?(ms|s|m|h|d)$",
+          "title": "Sync Timeout",
+          "type": "string"
+        },
+        "upload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Upload"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "HttpTrigger",
+      "type": "object"
+    },
+    "HumanAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "engine": {
+          "const": "human",
+          "title": "Engine",
+          "type": "string"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "human": {
+          "$ref": "#/$defs/HumanParams"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "human"
+      ],
+      "title": "HumanAgent",
+      "type": "object"
+    },
+    "HumanFormField": {
+      "additionalProperties": false,
+      "properties": {
+        "help": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Help"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "widget": {
+          "anyOf": [
+            {
+              "enum": [
+                "text",
+                "textarea",
+                "toggle",
+                "select",
+                "number",
+                "date"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Widget"
+        }
+      },
+      "title": "HumanFormField",
+      "type": "object"
+    },
+    "HumanParams": {
+      "additionalProperties": false,
+      "properties": {
+        "assignee": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Assignee"
+        },
+        "expires": {
+          "anyOf": [
+            {
+              "pattern": "^\\d+(\\.\\d+)?(ms|s|m|h|d)$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires"
+        },
+        "form": {
+          "additionalProperties": {
+            "$ref": "#/$defs/HumanFormField"
+          },
+          "default": {},
+          "title": "Form",
+          "type": "object"
+        },
+        "instruction": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instruction"
+        },
+        "required_group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Group"
+        },
+        "route_on": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Route On"
+        },
+        "show": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Show",
+          "type": "array"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "HumanParams",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "LlmAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "engine": {
+          "const": "llm",
+          "title": "Engine",
+          "type": "string"
+        },
+        "guardrails": {
+          "$ref": "#/$defs/Guardrails",
+          "default": {
+            "input": [],
+            "output": [],
+            "tools": []
+          }
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "llm": {
+          "$ref": "#/$defs/LlmParams"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "llm"
+      ],
+      "title": "LlmAgent",
+      "type": "object"
+    },
+    "LlmParams": {
+      "additionalProperties": false,
+      "properties": {
+        "memory": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MemoryParams"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
+        },
+        "skills": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Skills",
+          "type": "array"
+        },
+        "stream_field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stream Field"
+        },
+        "stream_tokens": {
+          "default": false,
+          "title": "Stream Tokens",
+          "type": "boolean"
+        },
+        "system": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "LlmParams",
+      "type": "object"
+    },
+    "LongFormField": {
+      "additionalProperties": false,
+      "properties": {
+        "default": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "LongFormField",
+      "type": "object"
+    },
+    "LoopAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "engine": {
+          "const": "loop",
+          "title": "Engine",
+          "type": "string"
+        },
+        "guardrails": {
+          "$ref": "#/$defs/Guardrails",
+          "default": {
+            "input": [],
+            "output": [],
+            "tools": []
+          }
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "loop": {
+          "$ref": "#/$defs/LoopParams"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "loop"
+      ],
+      "title": "LoopAgent",
+      "type": "object"
+    },
+    "LoopParams": {
+      "additionalProperties": false,
+      "properties": {
+        "memory": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MemoryParams"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "model": {
+          "minLength": 1,
+          "title": "Model",
+          "type": "string"
+        },
+        "skills": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Skills",
+          "type": "array"
+        },
+        "steering": {
+          "minLength": 1,
+          "title": "Steering",
+          "type": "string"
+        },
+        "supervisor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Supervisor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tools": {
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/AgentToolRef"
+              },
+              {
+                "$ref": "#/$defs/WorkflowToolRef"
+              },
+              {
+                "$ref": "#/$defs/CollectionToolRef"
+              },
+              {
+                "$ref": "#/$defs/McpToolRef"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Tools",
+          "type": "array"
+        }
+      },
+      "required": [
+        "model",
+        "steering",
+        "tools"
+      ],
+      "title": "LoopParams",
+      "type": "object"
+    },
+    "MapAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "effect": {
+          "default": "write",
+          "enum": [
+            "read",
+            "write",
+            "destructive"
+          ],
+          "title": "Effect",
+          "type": "string"
+        },
+        "engine": {
+          "const": "map",
+          "title": "Engine",
+          "type": "string"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "map": {
+          "$ref": "#/$defs/MapParams"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "map"
+      ],
+      "title": "MapAgent",
+      "type": "object"
+    },
+    "MapParams": {
+      "additionalProperties": false,
+      "properties": {
+        "as": {
+          "default": "item",
+          "minLength": 1,
+          "title": "As",
+          "type": "string"
+        },
+        "concurrency": {
+          "default": 4,
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Concurrency",
+          "type": "integer"
+        },
+        "max_items": {
+          "default": 100,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Max Items",
+          "type": "integer"
+        },
+        "on_error": {
+          "default": "fail",
+          "enum": [
+            "fail",
+            "collect"
+          ],
+          "title": "On Error",
+          "type": "string"
+        },
+        "over": {
+          "minLength": 1,
+          "title": "Over",
+          "type": "string"
+        },
+        "with": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "With",
+          "type": "object"
+        },
+        "workflow": {
+          "minLength": 1,
+          "title": "Workflow",
+          "type": "string"
+        }
+      },
+      "required": [
+        "over",
+        "workflow"
+      ],
+      "title": "MapParams",
+      "type": "object"
+    },
+    "McpExport": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "McpExport",
+      "type": "object"
+    },
+    "McpTool": {
+      "additionalProperties": false,
+      "properties": {
+        "args": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Args",
+          "type": "object"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "server": {
+          "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+          "title": "Server",
+          "type": "string"
+        },
+        "use": {
+          "const": "mcp",
+          "title": "Use",
+          "type": "string"
+        }
+      },
+      "required": [
+        "use",
+        "server",
+        "name"
+      ],
+      "title": "McpTool",
+      "type": "object"
+    },
+    "McpToolRef": {
+      "additionalProperties": false,
+      "properties": {
+        "allow": {
+          "description": "Explicit allow-list of MCP tool names.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Allow",
+          "type": "array"
+        },
+        "approval": {
+          "anyOf": [
+            {
+              "const": "required",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/ApprovalWhen"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        },
+        "mcp": {
+          "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+          "title": "Mcp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "mcp",
+        "allow"
+      ],
+      "title": "McpToolRef",
+      "type": "object"
+    },
+    "MemoryParams": {
+      "additionalProperties": false,
+      "description": "What an agent remembers across runs (see the memory built-ins).",
+      "properties": {
+        "collection": {
+          "minLength": 1,
+          "title": "Collection",
+          "type": "string"
+        },
+        "key": {
+          "default": "principal",
+          "minLength": 1,
+          "title": "Key",
+          "type": "string"
+        },
+        "max_tokens": {
+          "default": 1000,
+          "maximum": 20000,
+          "minimum": 1,
+          "title": "Max Tokens",
+          "type": "integer"
+        },
+        "recall_top_k": {
+          "default": 3,
+          "maximum": 20,
+          "minimum": 0,
+          "title": "Recall Top K",
+          "type": "integer"
+        },
+        "retention": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retention"
+        },
+        "window": {
+          "default": 5,
+          "maximum": 50,
+          "minimum": 0,
+          "title": "Window",
+          "type": "integer"
+        },
+        "write": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Write"
+        }
+      },
+      "required": [
+        "collection"
+      ],
+      "title": "MemoryParams",
+      "type": "object"
+    },
+    "ParallelAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "engine": {
+          "const": "parallel",
+          "title": "Engine",
+          "type": "string"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "parallel": {
+          "$ref": "#/$defs/ParallelParams"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "parallel"
+      ],
+      "title": "ParallelAgent",
+      "type": "object"
+    },
+    "ParallelParams": {
+      "additionalProperties": false,
+      "properties": {
+        "branches": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code": "#/$defs/CodeAgent",
+                "llm": "#/$defs/LlmAgent",
+                "tool": "#/$defs/ToolAgent"
+              },
+              "propertyName": "engine"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CodeAgent"
+              },
+              {
+                "$ref": "#/$defs/ToolAgent"
+              },
+              {
+                "$ref": "#/$defs/LlmAgent"
+              }
+            ]
+          },
+          "maxItems": 16,
+          "minItems": 2,
+          "title": "Branches",
+          "type": "array"
+        },
+        "concurrency": {
+          "anyOf": [
+            {
+              "maximum": 16,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Concurrency"
+        },
+        "on_error": {
+          "default": "fail",
+          "enum": [
+            "fail",
+            "collect"
+          ],
+          "title": "On Error",
+          "type": "string"
+        }
+      },
+      "required": [
+        "branches"
+      ],
+      "title": "ParallelParams",
+      "type": "object"
+    },
+    "PendingAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "engine": {
+          "const": "pending",
+          "title": "Engine",
+          "type": "string"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine"
+      ],
+      "title": "PendingAgent",
+      "type": "object"
+    },
+    "Policy": {
+      "additionalProperties": false,
+      "properties": {
+        "allow_secure_to_llm": {
+          "default": false,
+          "title": "Allow Secure To Llm",
+          "type": "boolean"
+        },
+        "max_bounded_agents": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Bounded Agents"
+        },
+        "max_depth": {
+          "default": 2,
+          "maximum": 5,
+          "minimum": 1,
+          "title": "Max Depth",
+          "type": "integer"
+        },
+        "max_tokens_per_run": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens Per Run"
+        },
+        "model_only_decisions": {
+          "default": "warn",
+          "enum": [
+            "warn",
+            "error",
+            "allow"
+          ],
+          "title": "Model Only Decisions",
+          "type": "string"
+        },
+        "require_human_before": {
+          "default": [],
+          "items": {
+            "enum": [
+              "write",
+              "destructive"
+            ],
+            "type": "string"
+          },
+          "title": "Require Human Before",
+          "type": "array"
+        }
+      },
+      "title": "Policy",
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "attempts": {
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Attempts",
+          "type": "integer"
+        },
+        "backoff": {
+          "default": 1.5,
+          "maximum": 10.0,
+          "minimum": 1.0,
+          "title": "Backoff",
+          "type": "number"
+        },
+        "errors": {
+          "default": [
+            "timeout",
+            "rate_limit",
+            "transient"
+          ],
+          "items": {
+            "enum": [
+              "timeout",
+              "rate_limit",
+              "parse_error",
+              "transient"
+            ],
+            "type": "string"
+          },
+          "title": "Errors",
+          "type": "array"
+        }
+      },
+      "required": [
+        "attempts"
+      ],
+      "title": "RetryPolicy",
+      "type": "object"
+    },
+    "Schedule": {
+      "additionalProperties": false,
+      "properties": {
+        "cron": {
+          "title": "Cron",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "input": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "default": {},
+          "title": "Input",
+          "type": "object"
+        }
+      },
+      "required": [
+        "cron"
+      ],
+      "title": "Schedule",
+      "type": "object"
+    },
+    "StorageTool": {
+      "additionalProperties": false,
+      "properties": {
+        "as": {
+          "default": "text",
+          "enum": [
+            "text",
+            "json",
+            "base64"
+          ],
+          "title": "As",
+          "type": "string"
+        },
+        "body": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null
+        },
+        "content_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Type"
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cursor"
+        },
+        "encoding": {
+          "default": "text",
+          "enum": [
+            "text",
+            "base64",
+            "json"
+          ],
+          "title": "Encoding",
+          "type": "string"
+        },
+        "expires_in": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires In"
+        },
+        "if_exists": {
+          "default": "fail",
+          "enum": [
+            "fail",
+            "overwrite"
+          ],
+          "title": "If Exists",
+          "type": "string"
+        },
+        "key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        },
+        "map": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Declared output key \u2192 result path.",
+          "title": "Map",
+          "type": "object"
+        },
+        "max_bytes": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Bytes"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "title": "Metadata",
+          "type": "object"
+        },
+        "method": {
+          "default": "GET",
+          "enum": [
+            "GET",
+            "PUT"
+          ],
+          "title": "Method",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "put",
+            "get",
+            "head",
+            "list",
+            "copy",
+            "delete",
+            "presign"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prefix"
+        },
+        "store": {
+          "minLength": 1,
+          "title": "Store",
+          "type": "string"
+        },
+        "to_key": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To Key"
+        },
+        "to_store": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To Store"
+        },
+        "use": {
+          "const": "storage",
+          "title": "Use",
+          "type": "string"
+        }
+      },
+      "required": [
+        "use",
+        "store",
+        "op"
+      ],
+      "title": "StorageTool",
+      "type": "object"
+    },
+    "Supervisor": {
+      "additionalProperties": false,
+      "properties": {
+        "every_n_iterations": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Every N Iterations",
+          "type": "integer"
+        },
+        "judge": {
+          "anyOf": [
+            {
+              "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Judge"
+        },
+        "on_judge_error": {
+          "default": "ignore",
+          "enum": [
+            "ignore",
+            "pause",
+            "abort"
+          ],
+          "title": "On Judge Error",
+          "type": "string"
+        },
+        "on_violation": {
+          "default": "pause",
+          "enum": [
+            "abort",
+            "pause",
+            "steer"
+          ],
+          "title": "On Violation",
+          "type": "string"
+        },
+        "rules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SupervisorRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        },
+        "steer_message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Steer Message"
+        }
+      },
+      "title": "Supervisor",
+      "type": "object"
+    },
+    "SupervisorRule": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Count"
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "enum": [
+                "write",
+                "destructive"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effect"
+        },
+        "gt": {
+          "anyOf": [
+            {
+              "exclusiveMaximum": 1.0,
+              "exclusiveMinimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gt"
+        },
+        "gte": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gte"
+        },
+        "then": {
+          "enum": [
+            "abort",
+            "pause",
+            "steer"
+          ],
+          "title": "Then",
+          "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
+        },
+        "when": {
+          "enum": [
+            "tool_repeated",
+            "budget_fraction",
+            "iteration_reached",
+            "effect_count"
+          ],
+          "title": "When",
+          "type": "string"
+        }
+      },
+      "required": [
+        "when",
+        "then"
+      ],
+      "title": "SupervisorRule",
+      "type": "object"
+    },
+    "ToolAgent": {
+      "additionalProperties": false,
+      "properties": {
+        "budget": {
+          "$ref": "#/$defs/Budget",
+          "default": {
+            "max_iterations": null,
+            "max_tokens": null,
+            "max_tool_calls": null,
+            "retry": null,
+            "timeout": null
+          }
+        },
+        "compensate": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensate"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "effect": {
+          "anyOf": [
+            {
+              "enum": [
+                "read",
+                "write",
+                "destructive"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override; never weaker than the derived effect, except that an http POST/PUT/PATCH may declare 'read' (a lookup sent as POST).",
+          "title": "Effect"
+        },
+        "engine": {
+          "const": "tool",
+          "title": "Engine",
+          "type": "string"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "id": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Inputs",
+          "type": "object"
+        },
+        "outputs": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Outputs",
+          "type": "object"
+        },
+        "routes": {
+          "patternProperties": {
+            "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+              "pattern": "^(END(\\.[a-z][a-z0-9_]*)?|[a-z][a-z0-9_]*)$",
+              "type": "string"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Routes",
+          "type": "object"
+        },
+        "signal_outputs": {
+          "anyOf": [
+            {
+              "patternProperties": {
+                "^[A-Za-z0-9_][A-Za-z0-9_.\\-]*$": {
+                  "additionalProperties": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "$ref": "#/$defs/LongFormField"
+                      }
+                    ]
+                  },
+                  "type": "object"
+                }
+              },
+              "propertyNames": {
+                "maxLength": 64
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Signal Outputs"
+        },
+        "tool": {
+          "discriminator": {
+            "mapping": {
+              "db": "#/$defs/DbTool",
+              "http": "#/$defs/HttpTool",
+              "mcp": "#/$defs/McpTool",
+              "storage": "#/$defs/StorageTool"
+            },
+            "propertyName": "use"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/DbTool"
+            },
+            {
+              "$ref": "#/$defs/HttpTool"
+            },
+            {
+              "$ref": "#/$defs/McpTool"
+            },
+            {
+              "$ref": "#/$defs/StorageTool"
+            }
+          ],
+          "title": "Tool"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "routes",
+        "engine",
+        "tool"
+      ],
+      "title": "ToolAgent",
+      "type": "object"
+    },
+    "Trigger": {
+      "additionalProperties": false,
+      "properties": {
+        "http": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HttpTrigger"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "input": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/LongFormField"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Input",
+          "type": "object"
+        },
+        "mcp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/McpExport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "schedule": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Schedule"
+            },
+            {
+              "description": "A cron expression: shorthand for {cron: \u2026}",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "tenants": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tenants",
+          "type": "array"
+        }
+      },
+      "title": "Trigger",
+      "type": "object"
+    },
+    "Upload": {
+      "additionalProperties": false,
+      "description": "``multipart/form-data`` on a trigger: each ``file`` input is stored here.",
+      "properties": {
+        "accept": {
+          "default": [],
+          "description": "Allowed content types (`application/pdf`, `image/*`); empty: any",
+          "items": {
+            "type": "string"
+          },
+          "title": "Accept",
+          "type": "array"
+        },
+        "max_bytes": {
+          "default": 16777216,
+          "description": "Largest single file",
+          "minimum": 1,
+          "title": "Max Bytes",
+          "type": "integer"
+        },
+        "max_files": {
+          "default": 10,
+          "description": "Files per request",
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Files",
+          "type": "integer"
+        },
+        "prefix": {
+          "default": "",
+          "description": "Key prefix inside the store, e.g. `inbox/`",
+          "title": "Prefix",
+          "type": "string"
+        },
+        "store": {
+          "description": "The `kind: Storage` store the files land in",
+          "minLength": 1,
+          "title": "Store",
+          "type": "string"
+        }
+      },
+      "required": [
+        "store"
+      ],
+      "title": "Upload",
+      "type": "object"
+    },
+    "Webhook": {
+      "additionalProperties": false,
+      "description": "A notification to one HTTPS endpoint when a run reaches a stage (`spec.webhooks`).\n\nIt carries only a run id and what happened; the receiver pulls the run with its own token.\nThe URL and the secret come from the environment, never from a caller.",
+      "properties": {
+        "allow_private": {
+          "default": false,
+          "description": "Permit an internal or http:// target (inside your network)",
+          "title": "Allow Private",
+          "type": "boolean"
+        },
+        "events": {
+          "default": [],
+          "items": {
+            "enum": [
+              "completed",
+              "failed",
+              "aborted",
+              "waiting"
+            ],
+            "type": "string"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z0-9_-]{0,62}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "previous_secret": {
+          "default": "",
+          "description": "`${ENV_VAR}` of the secret being replaced; both sign during rotation",
+          "title": "Previous Secret",
+          "type": "string"
+        },
+        "secret": {
+          "description": "`${ENV_VAR}` holding at least 32 bytes; signs every call",
+          "title": "Secret",
+          "type": "string"
+        },
+        "stages": {
+          "default": [],
+          "description": "Agent ids: notify each time one of them finishes",
+          "items": {
+            "maxLength": 64,
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "type": "string"
+          },
+          "title": "Stages",
+          "type": "array"
+        },
+        "url": {
+          "description": "`${ENV_VAR}` (or an https:// literal); checked again when sent",
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "url",
+        "secret"
+      ],
+      "title": "Webhook",
+      "type": "object"
+    },
+    "WorkflowMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Group"
+        },
+        "name": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "required_group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Group"
+        },
+        "required_scope": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required Scope"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "WorkflowMetadata",
+      "type": "object"
+    },
+    "WorkflowSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "agents": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "code": "#/$defs/CodeAgent",
+                "decide": "#/$defs/DecideAgent",
+                "human": "#/$defs/HumanAgent",
+                "llm": "#/$defs/LlmAgent",
+                "loop": "#/$defs/LoopAgent",
+                "map": "#/$defs/MapAgent",
+                "parallel": "#/$defs/ParallelAgent",
+                "pending": "#/$defs/PendingAgent",
+                "tool": "#/$defs/ToolAgent"
+              },
+              "propertyName": "engine"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/PendingAgent"
+              },
+              {
+                "$ref": "#/$defs/CodeAgent"
+              },
+              {
+                "$ref": "#/$defs/ToolAgent"
+              },
+              {
+                "$ref": "#/$defs/DecideAgent"
+              },
+              {
+                "$ref": "#/$defs/LlmAgent"
+              },
+              {
+                "$ref": "#/$defs/LoopAgent"
+              },
+              {
+                "$ref": "#/$defs/HumanAgent"
+              },
+              {
+                "$ref": "#/$defs/MapAgent"
+              },
+              {
+                "$ref": "#/$defs/ParallelAgent"
+              }
+            ]
+          },
+          "minItems": 1,
+          "title": "Agents",
+          "type": "array"
+        },
+        "hooks": {
+          "default": [],
+          "items": {
+            "pattern": "^artifact://[A-Za-z0-9][A-Za-z0-9_.\\-]*(@[1-9][0-9]*)?$",
+            "type": "string"
+          },
+          "title": "Hooks",
+          "type": "array"
+        },
+        "models": {
+          "default": [],
+          "items": {
+            "pattern": "^[A-Z][A-Za-z0-9_]*(@[A-Za-z0-9_.\\-]+)?$",
+            "type": "string"
+          },
+          "title": "Models",
+          "type": "array"
+        },
+        "outputs": {
+          "patternProperties": {
+            "^[a-z][a-z0-9_]*$": {
+              "$ref": "#/$defs/EndOutput"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 64
+          },
+          "title": "Outputs",
+          "type": "object"
+        },
+        "policy": {
+          "$ref": "#/$defs/Policy",
+          "default": {
+            "allow_secure_to_llm": false,
+            "max_bounded_agents": null,
+            "max_depth": 2,
+            "max_tokens_per_run": null,
+            "model_only_decisions": "warn",
+            "require_human_before": []
+          }
+        },
+        "start": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "pattern": "^[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start"
+        },
+        "supervisor": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Supervisor"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "transaction": {
+          "default": "per_agent",
+          "enum": [
+            "per_agent",
+            "per_run"
+          ],
+          "title": "Transaction",
+          "type": "string"
+        },
+        "trigger": {
+          "$ref": "#/$defs/Trigger",
+          "default": {
+            "http": null,
+            "input": {},
+            "mcp": null,
+            "schedule": null,
+            "tenants": []
+          }
+        },
+        "webhooks": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Webhook"
+          },
+          "title": "Webhooks",
+          "type": "array"
+        }
+      },
+      "required": [
+        "agents"
+      ],
+      "title": "WorkflowSpec",
+      "type": "object"
+    },
+    "WorkflowToolRef": {
+      "additionalProperties": false,
+      "properties": {
+        "approval": {
+          "anyOf": [
+            {
+              "const": "required",
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/ApprovalWhen"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Calls"
+        },
+        "workflow": {
+          "maxLength": 64,
+          "pattern": "^[a-z][a-z0-9_]*$",
+          "title": "Workflow",
+          "type": "string"
+        }
+      },
+      "required": [
+        "workflow"
+      ],
+      "title": "WorkflowToolRef",
+      "type": "object"
+    }
+  },
+  "$id": "https://tuvl.dev/schema/2.0/workflow.json",
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "kind": {
+      "const": "Workflow",
+      "title": "Kind",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/WorkflowMetadata"
+    },
+    "spec": {
+      "$ref": "#/$defs/WorkflowSpec"
+    },
+    "version": {
+      "const": "tuvl/v2",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "version",
+    "metadata",
+    "spec"
+  ],
+  "title": "WorkflowDocument",
+  "type": "object"
+}

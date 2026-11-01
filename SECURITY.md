@@ -6,7 +6,7 @@ Security updates are provided for the latest release of the TUVL engine. Please 
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.x     | :white_check_mark: |
+| 2.x     | :white_check_mark: |
 
 ## Reporting a Vulnerability
 
@@ -49,9 +49,9 @@ security@tuvl.io.
 
 ### Reporting channels
 
-Email is the primary channel today. The tuvl engine source is currently
-developed privately and will be published in a future release; once the code is
-public we will also enable **GitHub Private Vulnerability Reporting** on the
-public repository and list it here as an alternative.
+Email is the primary channel. You can also report through **GitHub private
+vulnerability reporting**: open the
+[Security tab of tuvl-io/tuvl](https://github.com/tuvl-io/tuvl/security/advisories/new)
+and choose "Report a vulnerability". Either way the report stays private until a fix is released.
 
 Thank you for helping keep TUVL secure!

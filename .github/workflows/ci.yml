@@ -1,0 +1,301 @@
+name: CI
+
+# Hosted by default. In a private repository, set the variable CI_RUNS_ON to '["self-hosted","tuvl-local"]' (and CI_PG_PORT
+# to the local Postgres port) to run on a self-hosted macOS runner that has Postgres and Redis running. A public repository
+# always runs on GitHub-hosted runners, because a fork's pull request would otherwise run its code on that machine.
+
+# Work happens on develop; main only takes a pull request from develop (a release), and a v*.*.* tag on
+# main publishes. A branch with a pull request is tested once, by the pull request; pushes are tested on the
+# long-lived branches only. A newer push to a pull request cancels the run it replaces.
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  changes:
+    name: What changed
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    outputs:
+      insight: ${{ steps.diff.outputs.insight }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        # Runs on every push to a long-lived branch. On a pull request it is skipped only when every changed
+        # file is one the test cannot reach: docs, tests, or the developer toolchain (CLI, terminal UI, spec flow).
+        run: |
+          skip='^(docs/|tests/|[^/]*\.md$|LICENSE|NOTICE|src/tuvl/(cli|tui|spec|coding_agents|review|skills|codegen|uispec|shipgate|shiparchive|specgen|taskrun|gitflow|gitutil)(/|\.py))'
+          if [ "${{ github.event_name }}" = "pull_request" ] \
+              && ! git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -qvE "$skip"; then
+            echo "insight=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "insight=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  quality:
+    name: Lint & Test (Python ${{ matrix.python }})
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13", "3.14"]
+
+    env:
+      # Test conftest sets these too, but having them at the runner level
+      # makes ad-hoc debug commands (uv run python -c ...) behave consistently.
+      TUVL_ENV: development
+      TUVL_DEV_MODE: "true"
+      TUVL_ALLOW_DEV_AUTH: "true"
+      TUVL_TEST_PG_URL: postgresql+asyncpg://tuvl:tuvl@localhost:${{ vars.CI_PG_PORT || '5432' }}/tuvl_test
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: ${{ vars.CI_PG_PORT || '5432' }}
+      POSTGRES_DB: tuvl_test
+      POSTGRES_USER: tuvl
+      POSTGRES_PASSWORD: tuvl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Each self-hosted runner has its own Postgres (TUVL_CI_PG_PORT in its .env), so jobs on two runners never share a database.
+      - name: Use this runner's Postgres
+        if: runner.environment == 'self-hosted'
+        run: |
+          port="${TUVL_CI_PG_PORT:-${{ vars.CI_PG_PORT }}}"
+          echo "POSTGRES_PORT=$port" >> "$GITHUB_ENV"
+          echo "TUVL_TEST_PG_URL=postgresql+asyncpg://tuvl:tuvl@localhost:$port/tuvl_test" >> "$GITHUB_ENV"
+          echo "TUVL_SMOKE_PORT=${TUVL_CI_SMOKE_PORT:-8890}" >> "$GITHUB_ENV"
+
+      # The integration tests need Postgres (pgvector) and Redis. The runner's
+      # own packages are used instead of service containers: Docker Hub's
+      # unauthenticated pull limit made image pulls fail the job.
+      - name: Start PostgreSQL and Redis
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-16-pgvector redis-server
+          sudo systemctl start postgresql.service redis-server.service
+          sudo -u postgres psql -qc "CREATE USER tuvl WITH SUPERUSER PASSWORD 'tuvl';"
+          sudo -u postgres createdb -O tuvl tuvl_test
+
+      - name: Set up uv (with cache)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      # actions/setup-python installs into /Users/runner, which a self-hosted Mac cannot create;
+      # there uv finds the interpreter that is already installed.
+      - name: Set up Python
+        if: runner.environment != 'self-hosted'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+
+      - name: Install dependencies (core + standard + dev)
+        run: uv sync --python ${{ matrix.python }} --extra standard --group dev
+
+      - name: Lint (ruff + format check)
+        run: make check
+
+      - name: Typecheck (mypy, all of src/)
+        run: make typecheck
+
+      - name: Run tests
+        # No -q so failure context is captured in the CI log.
+        run: uv run pytest tests/
+
+  fresh-install:
+    # Installs the built wheel without uv.lock, the way `uv tool install tuvl` does: catches a
+    # dependency release that breaks tuvl (mcp 2.x renamed FastMCP) before users hit it.
+    name: Fresh install (no lockfile)
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+      - name: Build the wheel
+        run: uv build --package tuvl --no-sources
+      - name: Install it fresh and import every module
+        run: |
+          uv venv --clear --python 3.14 $RUNNER_TEMP/fresh
+          uv pip install --python $RUNNER_TEMP/fresh/bin/python dist/tuvl-*.whl
+          $RUNNER_TEMP/fresh/bin/python scripts/import_sweep.py
+          # a bare install is the production CLI: toolchain commands answer with the install hint
+          $RUNNER_TEMP/fresh/bin/tuvl --version
+          $RUNNER_TEMP/fresh/bin/tuvl check system --help > /dev/null
+          $RUNNER_TEMP/fresh/bin/tuvl generate rls --help > /dev/null
+          set +e; $RUNNER_TEMP/fresh/bin/tuvl init demo -y 2> $RUNNER_TEMP/hint.txt; code=$?; set -e
+          test "$code" = 2 && grep -q "tuvl\[standard\]" $RUNNER_TEMP/hint.txt
+          # the bare install may skip only the modules that need an extra; with every extra, none
+          uv pip install --python $RUNNER_TEMP/fresh/bin/python "$(ls dist/tuvl-*.whl)[mcp,redis,vector,otel-grpc,codegen,test,pdf,review,tui]"
+          $RUNNER_TEMP/fresh/bin/python scripts/import_sweep.py | tee $RUNNER_TEMP/sweep.txt
+          ! grep -q "needs an extra" $RUNNER_TEMP/sweep.txt
+      - name: A sample project passes validation
+        run: |
+          cd "$RUNNER_TEMP" && rm -rf demo && $RUNNER_TEMP/fresh/bin/tuvl init demo --sample -y
+          cd demo && $RUNNER_TEMP/fresh/bin/tuvl lint project --strict
+
+  ui:
+    name: UI (typecheck, lint, test)
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        working-directory: ui
+        run: pnpm exec tsc -b
+
+      - name: Lint
+        working-directory: ui
+        run: pnpm lint
+
+      - name: Run tests
+        working-directory: ui
+        run: pnpm test
+
+  insight-smoke:
+    name: Insight smoke (Playwright)
+    needs: changes
+    if: needs.changes.outputs.insight == 'true'
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: ${{ vars.CI_PG_PORT || '5432' }}
+      POSTGRES_DB: tuvl_smoke
+      POSTGRES_USER: tuvl
+      POSTGRES_PASSWORD: tuvl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Each self-hosted runner has its own Postgres (TUVL_CI_PG_PORT in its .env), so jobs on two runners never share a database.
+      - name: Use this runner's Postgres
+        if: runner.environment == 'self-hosted'
+        run: |
+          port="${TUVL_CI_PG_PORT:-${{ vars.CI_PG_PORT }}}"
+          echo "POSTGRES_PORT=$port" >> "$GITHUB_ENV"
+          echo "TUVL_TEST_PG_URL=postgresql+asyncpg://tuvl:tuvl@localhost:$port/tuvl_test" >> "$GITHUB_ENV"
+          echo "TUVL_SMOKE_PORT=${TUVL_CI_SMOKE_PORT:-8890}" >> "$GITHUB_ENV"
+
+      - name: Start PostgreSQL and Redis (runner packages, no image pulls)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-16-pgvector redis-server
+          sudo systemctl start postgresql.service redis-server.service
+          sudo -u postgres psql -qc "CREATE USER tuvl WITH SUPERUSER PASSWORD 'tuvl';"
+          sudo -u postgres createdb -O tuvl tuvl_smoke
+
+      - name: Set up uv (with cache)
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      # actions/setup-python installs into /Users/runner, which a self-hosted Mac cannot create;
+      # there uv finds the interpreter that is already installed.
+      - name: Set up Python
+        if: runner.environment != 'self-hosted'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install tuvl
+        run: |
+          uv sync --python 3.13 --extra standard
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: "10"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Build Insight
+        working-directory: ui
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:cli
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Smoke test every page
+        # The editable workspace install of tuvl-insight puts src/tuvl_insight
+        # itself on sys.path, so `import tuvl_insight` needs src/ explicitly.
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src
+        run: scripts/insight-smoke.sh
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ui/playwright-report
+          retention-days: 7
+
+  branch-flow:
+    name: main takes pull requests from develop only
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    permissions: {}
+    steps:
+      - name: Check the head branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [[ "$HEAD_REF" != "develop" || "$HEAD_REPO" != "$GITHUB_REPOSITORY" ]]; then
+            echo "::error::main only takes pull requests from develop; open this one against develop"
+            exit 1
+          fi
+
+  # a push to main must be a release merged from develop (rules can block the rest once the repo is public)
+  main-from-develop:
+    name: main only contains develop
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check the pushed commit came from develop
+        run: |
+          git fetch --no-tags origin develop
+          if git merge-base --is-ancestor "$GITHUB_SHA" origin/develop; then exit 0; fi # fast-forward from develop
+          SECOND=$(git rev-parse --verify --quiet "$GITHUB_SHA^2" || true) # merge commit of develop
+          if [[ -n "$SECOND" ]] && git merge-base --is-ancestor "$SECOND" origin/develop; then exit 0; fi
+          echo "::error::$GITHUB_SHA was pushed to main without coming from develop"
+          exit 1

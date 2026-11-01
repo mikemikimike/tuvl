@@ -1,0 +1,1193 @@
+{
+  "check storage": {
+    "additionalProperties": false,
+    "description": "``tuvl check storage --json``: per store ``ok``, ``provider`` and either ``missing`` or ``steps``.",
+    "properties": {
+      "healthy": {
+        "title": "Healthy",
+        "type": "boolean"
+      },
+      "stores": {
+        "additionalProperties": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "title": "Stores",
+        "type": "object"
+      }
+    },
+    "required": [
+      "healthy",
+      "stores"
+    ],
+    "title": "StorageCheckReport",
+    "type": "object"
+  },
+  "check system": {
+    "$defs": {
+      "DoctorCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "fixable": {
+            "title": "Fixable",
+            "type": "boolean"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "hint": {
+            "title": "Hint",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "warn",
+              "fail",
+              "skip"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group",
+          "id",
+          "status",
+          "detail",
+          "hint",
+          "fixable"
+        ],
+        "title": "DoctorCheck",
+        "type": "object"
+      },
+      "DoctorSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "fail": {
+            "title": "Fail",
+            "type": "integer"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "integer"
+          },
+          "skip": {
+            "title": "Skip",
+            "type": "integer"
+          },
+          "warn": {
+            "title": "Warn",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "warn",
+          "fail",
+          "skip"
+        ],
+        "title": "DoctorSummary",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl check system --json``",
+    "properties": {
+      "checks": {
+        "default": [],
+        "items": {
+          "$ref": "#/$defs/DoctorCheck"
+        },
+        "title": "Checks",
+        "type": "array"
+      },
+      "fixed": {
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "title": "Fixed",
+        "type": "array"
+      },
+      "groups": {
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "title": "Groups",
+        "type": "array"
+      },
+      "healthy": {
+        "title": "Healthy",
+        "type": "boolean"
+      },
+      "models": {
+        "additionalProperties": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "title": "Models",
+        "type": "object"
+      },
+      "storage": {
+        "additionalProperties": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "default": {},
+        "title": "Storage",
+        "type": "object"
+      },
+      "summary": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/DoctorSummary"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      }
+    },
+    "required": [
+      "healthy",
+      "models"
+    ],
+    "title": "DoctorReport",
+    "type": "object"
+  },
+  "lint project": {
+    "$defs": {
+      "Issue": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "line": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Line"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "severity",
+          "file",
+          "line",
+          "code",
+          "message"
+        ],
+        "title": "Issue",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl lint project --json``",
+    "properties": {
+      "errors": {
+        "items": {
+          "$ref": "#/$defs/Issue"
+        },
+        "title": "Errors",
+        "type": "array"
+      },
+      "models": {
+        "additionalProperties": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "default": {},
+        "title": "Models",
+        "type": "object"
+      },
+      "profiles": {
+        "additionalProperties": {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        "title": "Profiles",
+        "type": "object"
+      },
+      "valid": {
+        "title": "Valid",
+        "type": "boolean"
+      },
+      "warnings": {
+        "items": {
+          "$ref": "#/$defs/Issue"
+        },
+        "title": "Warnings",
+        "type": "array"
+      }
+    },
+    "required": [
+      "valid",
+      "errors",
+      "warnings",
+      "profiles"
+    ],
+    "title": "ValidateReport",
+    "type": "object"
+  },
+  "lint spec": {
+    "$defs": {
+      "SpecCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/$defs/SpecFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "sections": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sections",
+            "type": "array"
+          },
+          "spec": {
+            "title": "Spec",
+            "type": "string"
+          },
+          "unchecked": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unchecked",
+            "type": "array"
+          },
+          "warnings": {
+            "title": "Warnings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "spec",
+          "path",
+          "ok",
+          "errors",
+          "warnings",
+          "findings",
+          "unchecked",
+          "hash",
+          "sections"
+        ],
+        "title": "SpecCheck",
+        "type": "object"
+      },
+      "SpecFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "waived"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "line",
+          "message"
+        ],
+        "title": "SpecFinding",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl lint spec --json``",
+    "properties": {
+      "ok": {
+        "title": "Ok",
+        "type": "boolean"
+      },
+      "specs": {
+        "items": {
+          "$ref": "#/$defs/SpecCheck"
+        },
+        "title": "Specs",
+        "type": "array"
+      }
+    },
+    "required": [
+      "ok",
+      "specs"
+    ],
+    "title": "SpecCheckReport",
+    "type": "object"
+  },
+  "list tasks": {
+    "$defs": {
+      "PlanStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "spec": {
+            "title": "Spec",
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/$defs/TaskStatus"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "spec",
+          "tasks"
+        ],
+        "title": "PlanStatus",
+        "type": "object"
+      },
+      "TaskStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "blocked": {
+            "title": "Blocked",
+            "type": "boolean"
+          },
+          "depends_on": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "failure": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Failure"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "live": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Live"
+          },
+          "obsolete": {
+            "title": "Obsolete",
+            "type": "boolean"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "stale": {
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "todo",
+              "in_progress",
+              "implemented",
+              "tested",
+              "done",
+              "untracked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "target": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Target",
+            "type": "object"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "waiting_on": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Waiting On",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "type",
+          "status",
+          "blocked",
+          "stale",
+          "obsolete",
+          "reasons"
+        ],
+        "title": "TaskStatus",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl list tasks --json``",
+    "properties": {
+      "done": {
+        "title": "Done",
+        "type": "boolean"
+      },
+      "plans": {
+        "items": {
+          "$ref": "#/$defs/PlanStatus"
+        },
+        "title": "Plans",
+        "type": "array"
+      }
+    },
+    "required": [
+      "done",
+      "plans"
+    ],
+    "title": "SpecStatusReport",
+    "type": "object"
+  },
+  "replay runs": {
+    "$defs": {
+      "TestResult": {
+        "additionalProperties": false,
+        "properties": {
+          "compensated": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Compensated",
+            "type": "array"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "failures": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failures",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "path": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Path",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "stubbed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stubbed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stubbed",
+            "type": "array"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "workflow",
+          "status",
+          "passed",
+          "failures",
+          "end",
+          "path",
+          "tokens",
+          "stubbed",
+          "warnings"
+        ],
+        "title": "TestResult",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl replay runs --json``",
+    "properties": {
+      "passed": {
+        "title": "Passed",
+        "type": "boolean"
+      },
+      "replays": {
+        "items": {
+          "$ref": "#/$defs/TestResult"
+        },
+        "title": "Replays",
+        "type": "array"
+      }
+    },
+    "required": [
+      "passed",
+      "replays"
+    ],
+    "title": "ReplayReport",
+    "type": "object"
+  },
+  "run tests": {
+    "$defs": {
+      "TestResult": {
+        "additionalProperties": false,
+        "properties": {
+          "compensated": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Compensated",
+            "type": "array"
+          },
+          "end": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End"
+          },
+          "failures": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failures",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          },
+          "path": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Path",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "stubbed",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stubbed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stubbed",
+            "type": "array"
+          },
+          "tokens": {
+            "title": "Tokens",
+            "type": "integer"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "workflow",
+          "status",
+          "passed",
+          "failures",
+          "end",
+          "path",
+          "tokens",
+          "stubbed",
+          "warnings"
+        ],
+        "title": "TestResult",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl run tests --json``",
+    "properties": {
+      "passed": {
+        "title": "Passed",
+        "type": "boolean"
+      },
+      "stubbed": {
+        "default": [],
+        "items": {
+          "type": "string"
+        },
+        "title": "Stubbed",
+        "type": "array"
+      },
+      "tests": {
+        "items": {
+          "$ref": "#/$defs/TestResult"
+        },
+        "title": "Tests",
+        "type": "array"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Warnings",
+        "type": "array"
+      }
+    },
+    "required": [
+      "passed",
+      "tests",
+      "warnings"
+    ],
+    "title": "TestReport",
+    "type": "object"
+  },
+  "show drift": {
+    "$defs": {
+      "SpecDiff": {
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "title": "Changed",
+            "type": "boolean"
+          },
+          "spec": {
+            "title": "Spec",
+            "type": "string"
+          },
+          "stale": {
+            "items": {
+              "$ref": "#/$defs/StaleTask"
+            },
+            "title": "Stale",
+            "type": "array"
+          },
+          "uncovered": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncovered",
+            "type": "array"
+          }
+        },
+        "required": [
+          "spec",
+          "changed",
+          "stale",
+          "uncovered"
+        ],
+        "title": "SpecDiff",
+        "type": "object"
+      },
+      "StaleTask": {
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "title": "Task",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task",
+          "why"
+        ],
+        "title": "StaleTask",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl show drift --json`` (a list, one entry per spec)",
+    "properties": {
+      "specs": {
+        "items": {
+          "$ref": "#/$defs/SpecDiff"
+        },
+        "title": "Specs",
+        "type": "array"
+      }
+    },
+    "required": [
+      "specs"
+    ],
+    "title": "SpecDiffReport",
+    "type": "object"
+  },
+  "verify spec": {
+    "$defs": {
+      "ExampleTrace": {
+        "additionalProperties": false,
+        "properties": {
+          "failures": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Failures",
+            "type": "array"
+          },
+          "flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flow"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "passed",
+              "stubbed",
+              "failed",
+              "missing",
+              "not run"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "test": {
+            "title": "Test",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "line",
+          "flow",
+          "test",
+          "status"
+        ],
+        "title": "ExampleTrace",
+        "type": "object"
+      },
+      "FlowTrace": {
+        "additionalProperties": false,
+        "properties": {
+          "flow": {
+            "title": "Flow",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/$defs/StepTrace"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "flow",
+          "line",
+          "workflow",
+          "steps"
+        ],
+        "title": "FlowTrace",
+        "type": "object"
+      },
+      "SpecFinding": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "file": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "error",
+              "warning",
+              "waived"
+            ],
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "severity",
+          "line",
+          "message"
+        ],
+        "title": "SpecFinding",
+        "type": "object"
+      },
+      "SpecVerify": {
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "examples": {
+            "items": {
+              "$ref": "#/$defs/ExampleTrace"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
+          "findings": {
+            "items": {
+              "$ref": "#/$defs/SpecFinding"
+            },
+            "title": "Findings",
+            "type": "array"
+          },
+          "flows": {
+            "items": {
+              "$ref": "#/$defs/FlowTrace"
+            },
+            "title": "Flows",
+            "type": "array"
+          },
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "spec": {
+            "title": "Spec",
+            "type": "string"
+          },
+          "summary": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Summary",
+            "type": "object"
+          },
+          "tests_run": {
+            "title": "Tests Run",
+            "type": "boolean"
+          },
+          "warnings": {
+            "title": "Warnings",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "spec",
+          "path",
+          "ok",
+          "errors",
+          "warnings",
+          "findings",
+          "flows",
+          "examples",
+          "summary",
+          "tests_run"
+        ],
+        "title": "SpecVerify",
+        "type": "object"
+      },
+      "StepTests": {
+        "additionalProperties": false,
+        "properties": {
+          "mocked": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Mocked",
+            "type": "array"
+          },
+          "passed": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Passed",
+            "type": "array"
+          }
+        },
+        "required": [
+          "passed",
+          "mocked"
+        ],
+        "title": "StepTests",
+        "type": "object"
+      },
+      "StepTrace": {
+        "additionalProperties": false,
+        "properties": {
+          "agent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Agent"
+          },
+          "engine": {
+            "title": "Engine",
+            "type": "string"
+          },
+          "impl": {
+            "enum": [
+              "ok",
+              "pending",
+              "mismatch",
+              "missing"
+            ],
+            "title": "Impl",
+            "type": "string"
+          },
+          "line": {
+            "title": "Line",
+            "type": "integer"
+          },
+          "step": {
+            "title": "Step",
+            "type": "string"
+          },
+          "tests": {
+            "$ref": "#/$defs/StepTests"
+          }
+        },
+        "required": [
+          "step",
+          "line",
+          "engine",
+          "agent",
+          "impl",
+          "tests"
+        ],
+        "title": "StepTrace",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "description": "``tuvl verify spec --json``",
+    "properties": {
+      "ok": {
+        "title": "Ok",
+        "type": "boolean"
+      },
+      "specs": {
+        "items": {
+          "$ref": "#/$defs/SpecVerify"
+        },
+        "title": "Specs",
+        "type": "array"
+      }
+    },
+    "required": [
+      "ok",
+      "specs"
+    ],
+    "title": "SpecVerifyReport",
+    "type": "object"
+  }
+}

@@ -1,0 +1,50 @@
+"""tuvl 2.0 contract layer — the typed schema shared by loader, validator,
+runtime, codegen and Insight (spec §6–§8)."""
+
+from tuvl.contract.tel import (
+    Expression,
+    TELError,
+    TELEvalError,
+    TELSyntaxError,
+    TELTypeError,
+    Template,
+    compile_expr,
+    compile_template,
+)
+from tuvl.contract.types import (
+    MODEL_VARIANTS,
+    SCALARS,
+    FieldSpec,
+    ModelResolver,
+    TypeParseError,
+    TypeRef,
+    TypeResolutionError,
+    build_model,
+    format_type,
+    parse_field,
+    parse_type,
+    registry_resolver,
+)
+
+__all__ = [
+    "Expression",
+    "Template",
+    "TELError",
+    "TELEvalError",
+    "TELSyntaxError",
+    "TELTypeError",
+    "compile_expr",
+    "compile_template",
+    "MODEL_VARIANTS",
+    "SCALARS",
+    "FieldSpec",
+    "ModelResolver",
+    "TypeParseError",
+    "TypeRef",
+    "TypeResolutionError",
+    "build_model",
+    "format_type",
+    "parse_field",
+    "parse_type",
+    "registry_resolver",
+]

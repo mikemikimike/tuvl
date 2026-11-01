@@ -2,8 +2,8 @@
 
 > **Audience:** developers and coding agents authoring tuvl projects.
 > **Contract:** this manual is the ground truth for tuvl 2.0 documents. Never invent kinds, engines,
-> fields or signals that are not described here. When in doubt, ask tuvl: `tuvl validate --json`,
-> `tuvl spec status --json`, or the `tuvl mcp` tools.
+> fields or signals that are not described here. When in doubt, ask tuvl: `tuvl lint project --json`,
+> `tuvl list tasks --json`, or the `tuvl serve mcp` tools.
 > **Deeper references:** [runtime](runtime.md) · [engines](engines.md) · [decide](decide.md) ·
 > [loop and tools](loop-and-tools.md) · [judges](judges.md) · [spec-driven workflow](spec-driven.md) ·
 > [Insight](insight.md) · [API](api.md) · [CLI](cli.md) · [security](auth.md) · [observability](observability.md)
@@ -18,9 +18,9 @@ function, a database/HTTP/MCP call, a rules table, one model call, a bounded too
 Signals pick the next agent or a named end. Every run is **durable** and **journaled**: it survives
 restarts, can wait for people, and can be replayed as a test fixture.
 
-Work is **spec-driven**: intent lives in `specs/<name>.md`, in a grammar `tuvl spec check` checks;
-the coding agent writes the task list and builds; deterministic tooling (`spec verify`, `codegen`,
-`validate`, `test`, `lock`) tracks the project to done. YAML is the single source of truth — the Insight canvas and coding agents edit the
+Work is **spec-driven**: intent lives in `specs/<name>.md`, in a grammar `tuvl lint spec` checks;
+the coding agent writes the task list and builds; deterministic tooling (`verify spec`, `generate code`,
+`lint project`, `run tests`, `generate lock`) tracks the project to done. YAML is the single source of truth — the Insight canvas and coding agents edit the
 same files.
 
 ---
@@ -30,7 +30,7 @@ same files.
 ```
 my-project/
 ├── pyproject.toml / uv.lock      # Python deps (uv)
-├── tuvl.lock                     # reproducibility pins (tuvl lock)
+├── tuvl.lock                     # reproducibility pins (tuvl generate lock)
 ├── .env / .env.example           # secrets — never in YAML
 ├── config.yaml                   # optional ProjectConfig (dirs, …)
 ├── specs/                        # <name>.md (intent) + <name>.tasks.yaml (TaskPlan)
@@ -44,7 +44,7 @@ my-project/
 ├── artifacts/                    # prompt/steering/skill .md + kind: Artifact YAML
 ├── tests/                        # kind: Test; fixtures/ holds pinned run journals
 ├── fixtures/judge/               # labelled judge calibration subjects
-├── .agents/                      # coding-agent rules + skills (tuvl skills update)
+├── .agents/                      # coding-agent rules + skills (tuvl update skills)
 └── .tuvl/                        # system.yaml, layout/, dev session, judge cache (managed)
 ```
 
@@ -62,7 +62,7 @@ Folder names are conventions: discovery is recursive and dispatched by `kind:`.
 | `FederationProvider` | OAuth/OIDC login |
 | `Artifact` | Versioned assets (below) |
 | `Test` | `version: tuvl/v2` (§8) |
-| `TaskPlan` | `version: tuvl/v2`, the task list the coding agent writes (checked by `spec check`) |
+| `TaskPlan` | `version: tuvl/v2`, the task list the coding agent writes (checked by `lint spec`) |
 | `ProjectConfig`, `TelemetryConfig`, `SystemConfig` | Project and system settings |
 
 Every document uses the envelope `kind` + `metadata` + `spec`. `Workflow`, `Test` and `TaskPlan`
@@ -78,6 +78,7 @@ carry `version: tuvl/v2`; a 1.x-shaped workflow fails to load.
 | `guardrail` | YAML | `guardrails.{input,output,tools}` |
 | `hook` | YAML | agent/workflow `hooks` (observe-only) |
 | `mcp` | YAML | `tool.use: mcp`, loop MCP tools |
+| `Storage` | YAML (`storage/`) | `tool.use: storage`, `ctx.storage(name)` — see `docs/storage.md` |
 | `judge` | YAML | output guardrails, tests, supervisor ([judges](judges.md)) |
 | `rules` | YAML | `decide.rules: artifact://…` (reusable decision tables) |
 
@@ -95,6 +96,7 @@ Used in `inputs`, `outputs`, trigger input, end types, human forms and tests.
 | Form | Meaning |
 |---|---|
 | `str`, `int`, `float`, `bool`, `date`, `datetime`, `uuid`, `json` | Scalars |
+| `file` | A reference to an uploaded file: `{store, key, name, size, content_type, sha256}`. Only a trigger's multipart upload creates one (see `http.upload`); agents pass it on |
 | `enum[a, b, c]` | Closed string set |
 | `list[T]` | List of `T` |
 | `Order` | A `ModelDefinition`'s read shape (model names start uppercase) |
@@ -116,7 +118,7 @@ Used in `decide.rules[].when`, tool `approval.when`, test `assertions` and `{{ }
   Comparisons don't chain; `and`/`or`/`not` need booleans (no truthiness); ordering against `null` is `false`.
 - Functions (closed set): `len`, `lower`, `upper`, `contains`, `starts_with`, `ends_with`,
   `is_empty`, `now`, `days_between`.
-- Statically type-checked by `tuvl validate` against the agent's declared inputs (V008): every root
+- Statically type-checked by `tuvl lint project` against the agent's declared inputs (V008): every root
   name must be an input, fields are checked against models, enum literals must be enum values.
 
 ### Templates
@@ -140,8 +142,9 @@ metadata:
 spec:
   models: [Order, Refund]                # allow-list for tool:db and ctx.db
   trigger:
-    http:     { path: /api/refunds, method: POST, public: false, sync_timeout: 30s }
-    schedule: "0 * * * *"                # optional cron (UTC)
+    http:     { path: /api/refunds, method: POST, public: false, sync_timeout: 30s }   # enabled: false unmounts it
+    schedule: "0 * * * *"                # optional cron (UTC); or { cron, enabled, input: {…} }
+    tenants: [acme, globex]              # multi_tenant mode: one scheduled run per tenant
     mcp:      { enabled: true }          # optional MCP export (api.md)
     input:    { order_id: uuid, reason: str, message: str }
   start: load_order                      # entry agent; defaults to the first agent
@@ -179,7 +182,21 @@ Every template in a `body` must reference keys produced on **every** path to tha
 - `http`: default-deny — a valid bearer token is required unless `public: true` (which can't be
   combined with `required_scope`/`required_group`, V019). The response is the end's `status`/`body`,
   or `202` with the run descriptor when the run outlives `sync_timeout` or waits on a person.
-- `schedule`: cron in UTC; each slot fires once across all workers.
+- `spec.webhooks` declares signed notifications to your own HTTPS endpoints when a run completes, fails,
+  aborts, waits or finishes a named agent: `{ name, url: ${ENV}, secret: ${ENV}, events, stages }`. They carry only
+  a run id and what happened; the receiver pulls the run. Off unless `TUVL_WEBHOOKS_ENABLED=true`. See
+  `docs/webhooks.md`.
+- `http.upload` (`{ store, prefix, max_bytes, max_files, accept }`) lets the route take
+  `multipart/form-data`: each `file` / `list[file]` trigger input is stored in the named `kind: Storage`
+  store under a generated key and the run receives its reference, never the bytes. A JSON body cannot
+  carry a file. See `docs/storage.md`.
+- `http.enabled: false` keeps the route's settings but does not mount it; the workflow can still be
+  started with `POST /api/workflows/{name}/runs`.
+- `schedule`: cron in UTC; each slot fires once across all workers. The object form
+  `{ cron, enabled, input }` adds an off switch and the input every scheduled run starts with —
+  `input` must satisfy `trigger.input` (V019). A workflow can have both an `http` trigger and a
+  schedule. In `multi_tenant` mode add `tenants: [acme, …]`: each slot starts one run per tenant (see
+  `docs/runtime.md`).
 - `mcp.enabled`: lists the workflow as a tool on `/mcp` ([API](api.md)).
 - Every workflow can also be started with `POST /api/workflows/{name}/runs`.
 
@@ -246,16 +263,18 @@ An agent emits exactly one signal per invocation:
 | Engine | Reserved signals |
 |---|---|
 | all except `pending` | `error` (unmapped → V004 warning; the run fails) |
-| `tool` | db `read`/`delete`: `not_found` · db `create`/`update`/`upsert`: `conflict` · http: `http_<status>` (only if mapped) |
+| `tool` | db `read`/`delete`: `not_found` · db `create`/`update`/`upsert`: `conflict` · http: `http_<status>` (only if mapped) · storage `get`/`head`/`copy`: `not_found`; `put`/`copy` (`if_exists: fail`): `conflict`; `put`/`get`/`copy`: `too_large` (optional) |
 | `llm` | `parse_error`, `timeout`, `budget_exceeded`, `guardrail_violation` (with guardrails) |
 | `loop` | `max_iterations`, `budget_exceeded`, `timeout`, `aborted`, `guardrail_violation` (with guardrails) |
 | `decide` | `low_confidence` (with a model) |
 | `human` | `expired` (with `expires`) |
+| `map` | `partial` (a normal signal: only with `on_error: collect`, when routed); an item failing in `fail` mode is `error` (`map_item_failed`) |
+| `parallel` | `partial` (only with `on_error: collect`, when routed); a branch failing in `fail` mode is `error` (`parallel_branch_failed`) |
 
 `error` carries an `error_type` in the journal: `contract_violation`, `no_rule_matched`,
 `decision_model_unavailable`, `judge_unavailable`, `judge_uncertain`, `tool_args_invalid`,
-`http_error`, `db_error`, `mcp_error`, `code_exception`, `compensation_failed`, `policy_violation`,
-`lease_lost`, `approval_expired`.
+`http_error`, `db_error`, `mcp_error`, `storage_error`, `code_exception`, `compensation_failed`, `policy_violation`,
+`lease_lost`, `approval_expired`, `map_item_failed`, `map_too_many_items`, `max_depth`.
 
 ---
 
@@ -265,11 +284,13 @@ An agent emits exactly one signal per invocation:
 |---|---|---|---|
 | `pending` | none — a typed contract; runs as a typed stub in dev and tests | — | 0 |
 | `code` | an `@agent` Python function | deterministic | 0 |
-| `tool` | `db` / `http` / `mcp` operation | deterministic | 0 |
+| `tool` | `db` / `http` / `mcp` / `storage` operation | deterministic | 0 |
 | `decide` | ordered rules, then an optional decision model | deterministic (rules only) / bounded | 0 → low |
 | `llm` | one structured model call | bounded | $ |
 | `loop` | a bounded tool-using model loop | bounded | $$ |
 | `human` | a form for a person | external | 0 |
+| `map` | a child workflow per item of a list, a few at a time | the child's | the child's × `max_items` |
+| `parallel` | several different read-only agents at the same time | the strongest branch's | the sum of the branches |
 
 Only `code` agents need Python. Everything else is configured in YAML. Details and full examples:
 [engines](engines.md), [decide](decide.md), [loop and tools](loop-and-tools.md).
@@ -332,7 +353,7 @@ Only `code` agents need Python. Everything else is configured in YAML. Details a
 ## 7. Determinism, budgets and policy
 
 - A workflow's **profile** counts its agents per class ("11 agents · 8 deterministic · 2 bounded · 1
-  external"); `tuvl validate` prints it with the **worst-case tokens per run** (the maximum over paths
+  external"); `tuvl lint project` prints it with the **worst-case tokens per run** (the maximum over paths
   of summed `max_tokens`, including guardrail judges and child workflows).
 - Required budgets (V011): `llm` → `max_tokens`, `timeout`; `loop` → `max_iterations`, `max_tokens`,
   `max_tool_calls`, `timeout`; `decide` with an LLM-backed model → `max_tokens`, `timeout`.
@@ -374,18 +395,19 @@ spec:
       - { judge: artifact://refund-reply-quality@2, target: "{{ text }}" }
 ```
 
-- `tuvl test` is **offline**: `tool: db` and `code` agents run for real against an in-memory database
+- `tuvl run tests` is **offline**: `tool: db` and `code` agents run for real against an in-memory database
   seeded by `given:`, with the `as:` caller as the principal; an unmocked `human` agent stops the run
   (assert with `expect.wait`); unmocked model/HTTP/MCP agents fail with a hint to mock or replay them
-  (`--live` lets them call out).
+  (`--live` lets them call out). That database is in autocommit, so it keeps writes Postgres would roll
+  back (an agent's error outcome, a retried attempt, a `per_run` rollback): test rollback against Postgres.
 - **Honest results:** a test whose path goes through an unmocked `pending` agent (a typed placeholder)
   is **stubbed**, not passed — it is reported, doesn't count towards task status, and fails
-  `tuvl test --strict` (the CI gate).
+  `tuvl run tests --strict` (the CI gate).
 - **Mock policy:** mock what is non-deterministic, external or human (`llm`, `loop`, `decide` with a
   model, `tool http`/`mcp`, `human`). Mocking business logic (`code`, `tool db`, `decide` rules) is
   warning **T001** — seed `given:` rows and set `as:` instead.
 - `expect` order: structure (`end`/`wait`, `path`, `decisions`) → `output` → `assertions` → `judge`.
-- Pin any run as a fixture (`tuvl runs pin <run_id>` or Insight 📌); `replay:` then serves its
+- Pin any run as a fixture (`tuvl pin run <run_id>` or Insight 📌); `replay:` then serves its
   recorded engine results with zero tokens.
 - Judges are cached and calibrated ([judges](judges.md)).
 
@@ -394,14 +416,14 @@ spec:
 ## 9. The development loop
 
 ```bash
-tuvl spec new refund-automation            # write intent: specs/refund-automation.md
-tuvl spec check                            # the grammar: fix every blocking finding
+tuvl create spec refund-automation            # write intent: specs/refund-automation.md
+tuvl lint spec                            # the grammar: fix every blocking finding
 #   the coding agent writes specs/refund-automation.tasks.yaml (skill tuvl-plan)
-tuvl spec status --json                    # derived task statuses — pick the next unblocked task
+tuvl list tasks --json                    # derived task statuses — pick the next unblocked task
 #   build it (YAML engine blocks; Python bodies only for code agents)
-tuvl codegen                               # schemas, code-agent stubs, prompt placeholders, tests
-tuvl spec verify                           # does the build match the spec, step by step?
-tuvl spec check && tuvl validate --strict && tuvl codegen --check && tuvl lock --check && tuvl test --strict && tuvl spec verify --strict && tuvl spec status --strict
+tuvl generate code                               # schemas, code-agent stubs, prompt placeholders, tests
+tuvl verify spec                           # does the build match the spec, step by step?
+tuvl lint spec && tuvl lint project --strict && tuvl generate code --check && tuvl verify lock && tuvl run tests --strict && tuvl verify spec --strict && tuvl list tasks --strict
 ```
 
 That last line is the **CI gate**. Task statuses are **derived** (`todo` → `in_progress` →
@@ -412,7 +434,7 @@ See [spec-driven workflow](spec-driven.md).
 
 ## 10. Validation rules
 
-Severity: **E** error, **W** warning (error under `--strict`). `tuvl validate --json` reports
+Severity: **E** error, **W** warning (error under `--strict`). `tuvl lint project --json` reports
 `file:line`, code and message.
 
 | Code | Sev | Rule |
@@ -443,18 +465,35 @@ Severity: **E** error, **W** warning (error under `--strict`). `tuvl validate --
 | V024 | E (ship) | `tuvl.lock` missing or stale |
 | V025 | E | `code` agent `run` not registered, or its signature doesn't match the generated schema |
 | V026 | E | Decision provider not installed, or unpinned hosted decision model (W) |
+| V027 | E (ship) | The image build context isn't the tuvl allowlist, or would contain development files |
+| V028 | E | A model reference (`llm`, `loop`, `decide.model.ref`) is not a defined AgentModel or a provider/model id |
+| V029 | W / E (ship) | A model's credentials aren't declared: literal `api_key`, or an unknown provider without `api_key` |
+| V030 | E | A `tool: storage` agent names a store that no `kind: Storage` file declares |
+| V031 | E | A write op (`put`, `copy`, `delete`, `presign` PUT) targets a `readonly` store |
+| V032 | E | A literal storage `key` or `to_key` is unsafe: absolute, `..`, empty segment, control character |
+| V033 | E | `presign.expires_in` exceeds the store's `presign_max_seconds` |
+| V034 | E | A `kind: Storage` file is invalid: provider fields, a literal secret instead of `${ENV}`, or a non-https endpoint |
+| V035 | E | `map`: `over` is not a list input; the workflow is unknown, is this workflow, or lacks the `as`/`with` inputs; a required child input is not supplied |
+| V036 | E | `map`: the mapped workflow has a `human` or `pending` agent, or a loop tool that needs approval |
+| V039 | E | `llm.stream_tokens` with an output guardrail, or `stream_field` missing, ambiguous or not a `str` output |
+| V040 | E | `parallel`: a branch is not read-only (a write or destructive tool, a code agent with a write effect, an MCP tool) |
+| V041 | E | `parallel`: a branch reads an input the step does not take, two branches produce the same output, or the step's outputs are not exactly the branches' (optional with `on_error: collect`) |
+| V042 | E | `parallel` under `transaction: per_run` |
+| V043 | E | `memory`: an owner named from input on a public trigger; `write` names a field the agent does not have or one that carries secure model fields |
+| V038 | E / W | A webhook's `stages` names an agent the workflow does not have (E); `allow_private` lets it reach internal addresses and plain http (W) |
+| V037 | E / W | File uploads: `http.upload` without a `file` input, an unknown, read-only or too-small store, a `file` nested deeper than `file` / `list[file]`, or a `file` input with MCP export (E); a `file` input on a route with no `upload`, or a public upload (W) |
 
-`tuvl mcp`'s `explain_error` tool explains any code.
+`tuvl serve mcp`'s `explain_error` tool explains any code.
 
 ---
 
 ## 11. Rules for coding agents
 
-1. **Never infer project state — ask tuvl** (`--json` output or `tuvl mcp` tools).
+1. **Never infer project state — ask tuvl** (`--json` output or `tuvl serve mcp` tools).
 2. **Specs drive the work**; task status is derived, never set.
 3. **Never hand-edit generated files**: `agents/_generated/`, tests with `metadata.generated_from`,
    `tuvl.lock`. Regenerate them.
-4. **Only `code` agents need Python**, and only the function body; `tuvl codegen` owns the
+4. **Only `code` agents need Python**, and only the function body; `tuvl generate code` owns the
    decorator, signature and docstring.
 5. **Never invent fields, engines or kinds.**
 6. **Every change ends green** on the CI gate (§9).

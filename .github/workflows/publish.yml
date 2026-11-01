@@ -1,0 +1,328 @@
+name: Release to PyPI
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish (must match a git tag, e.g. v2026.2.3-beta.1)"
+        required: true
+
+# Publishes from tuvl-io/tuvl only, the public repository: the PyPI trusted publisher, the attestations and the build
+# source are all that repository, so a package can be checked against code anyone can read. A tag pushed to the private
+# repository skips every job. Runs on GitHub-hosted runners there; in the private repository CI_RUNS_ON still applies.
+concurrency:
+  group: pypi-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Stage 0: Quality gate ────────────────────────────────────────────────────
+  quality:
+    name: Lint & test
+    # every later job needs this one, so they are skipped too
+    if: github.repository == 'tuvl-io/tuvl'
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the tag is checked against main
+
+      - name: Tag must be on main
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          git fetch --no-tags origin main
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            git fetch --tags --quiet origin
+            COMMIT=$(git rev-parse --verify --quiet "refs/tags/${INPUT_TAG}^{commit}" || true)
+          else
+            COMMIT="$GITHUB_SHA"
+          fi
+          if [[ -z "$COMMIT" ]] || ! git merge-base --is-ancestor "$COMMIT" origin/main; then
+            echo "::error::the tag is not on main; merge develop into main and tag it there"
+            exit 1
+          fi
+
+      - name: Tag must match the version in pyproject.toml
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          [[ "$EVENT" == "workflow_dispatch" ]] && TAG="$INPUT_TAG"
+          WANT=$(echo "${TAG#v}" | sed -E -e 's/-alpha\.([0-9]+)/a\1/' -e 's/-beta\.([0-9]+)/b\1/' -e 's/-rc\.([0-9]+)/rc\1/')
+          HAVE=$(sed -nE 's/^version *= *"([^"]+)".*/\1/p' pyproject.toml | head -1)
+          if [[ "$WANT" != "$HAVE" ]]; then
+            echo "::error::tag $TAG is version $WANT but pyproject.toml says $HAVE; run make bump VERSION=… on develop first"
+            exit 1
+          fi
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        if: runner.environment != 'self-hosted'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dev dependencies
+        run: uv sync --extra standard --group dev
+
+      - name: Lint (ruff)
+        run: uv run ruff check src/ --output-format=concise
+
+      - name: Format check (ruff)
+        run: uv run ruff format --check src/
+
+      - name: Run tests
+        env:
+          TUVL_ENV: development
+          TUVL_DEV_MODE: "true"
+          TUVL_ALLOW_DEV_AUTH: "true"
+          TUVL_TEST_PG_URL: postgresql+asyncpg://tuvl:tuvl@localhost:${{ vars.CI_PG_PORT || '5432' }}/tuvl_test
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: ${{ vars.CI_PG_PORT || '5432' }}
+          POSTGRES_DB: tuvl_test
+          POSTGRES_USER: tuvl
+          POSTGRES_PASSWORD: tuvl
+        run: uv run pytest tests/ -q
+
+  # ── Stage 2: Build both packages ────────────────────────────────────────────
+  build-tuvl:
+    name: Build tuvl
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    needs: quality
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp version from tag
+        run: |
+          # Resolve the tag from whichever trigger fired.  workflow_dispatch
+          # MUST take precedence over GITHUB_REF_NAME because that env var is
+          # the branch name (e.g. "develop") on a manual run, NOT the tag the
+          # maintainer typed into the input field.  Previously this used
+          # ${GITHUB_REF_NAME:-${{ inputs.tag }}} which silently ignored the
+          # input on every workflow_dispatch run and stamped the branch name
+          # as the version — resulted in `version = "develop"` and a TOML
+          # parse error in the build step.
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          if [[ -z "$TAG" ]]; then
+            echo "::error::No tag resolved (GITHUB_REF_NAME and inputs.tag both empty)"
+            exit 1
+          fi
+          # Normalise semver pre-release to PEP 440:
+          #   v2026.2.1-alpha.3 → 2026.2.1a3
+          #   v2026.2.3-beta.1  → 2026.2.3b1
+          #   v2026.2.1-rc.1    → 2026.2.1rc1
+          TAG_VERSION=$(echo "${TAG#v}" | sed -E -e 's/-alpha\.([0-9]+)/a\1/' \
+                                                -e 's/-beta\.([0-9]+)/b\1/' \
+                                                -e 's/-rc\.([0-9]+)/rc\1/')
+          # Refuse to proceed if normalisation produced something that's still
+          # obviously not a PEP 440 version — fails loud before the build step
+          # gets a confusing "no workspace found" error.
+          if ! [[ "$TAG_VERSION" =~ ^[0-9] ]]; then
+            echo "::error::Resolved version '$TAG_VERSION' (from tag '$TAG') is not a valid PEP 440 version. Workflow was likely triggered without a proper v*.*.* tag."
+            exit 1
+          fi
+          echo "Stamping version: $TAG_VERSION"
+          sed -i.bak "s/^version = .*/version = \"$TAG_VERSION\"/" pyproject.toml
+          sed -i.bak "s/^version = .*/version = \"$TAG_VERSION\"/" src/tuvl_insight/pyproject.toml
+          sed -i.bak "s/\"tuvl>=[^\"]*\"/\"tuvl>=$TAG_VERSION\"/" src/tuvl_insight/pyproject.toml
+          # the [standard] extra pins tuvl-insight to the same release (a beta needs
+          # tuvl-insight>=2.0.0b1 — 2.0.0b1 does not satisfy >=2.0.0)
+          sed -i.bak "s/\"tuvl-insight>=[^\"]*\"/\"tuvl-insight>=$TAG_VERSION\"/" pyproject.toml
+          find . -name '*.bak' -not -path './ui/node_modules/*' -delete
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        if: runner.environment != 'self-hosted'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Build tuvl
+        run: uv build --package tuvl --no-sources
+
+      - name: Smoke-test built wheel
+        # Install the actual artefact we're about to publish in a clean venv,
+        # run `tuvl --version`, and confirm the stamped version matches the
+        # tag.  Catches packaging regressions before they hit PyPI.
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          # Same normalisation as the Stamp step above — keep in sync.
+          TAG_VERSION=$(echo "${TAG#v}" | sed -E -e 's/-alpha\.([0-9]+)/a\1/' \
+                                                -e 's/-beta\.([0-9]+)/b\1/' \
+                                                -e 's/-rc\.([0-9]+)/rc\1/')
+          SMOKE="$RUNNER_TEMP/smoke"
+          rm -rf "$SMOKE"
+          uv venv --quiet --python 3.13 "$SMOKE"
+          uv pip install --quiet --python "$SMOKE/bin/python" dist/tuvl-*.whl
+          REPORTED=$("$SMOKE/bin/tuvl" --version | awk '{print $NF}' | sed 's/^v//')
+          echo "Tag version:      $TAG_VERSION"
+          echo "Reported version: $REPORTED"
+          if [ "$REPORTED" != "$TAG_VERSION" ]; then
+            echo "::error::Built wheel reports $REPORTED but tag is $TAG_VERSION"
+            exit 1
+          fi
+          # dependencies resolved fresh (no lockfile), as users get them: every module must import
+          "$SMOKE/bin/python" scripts/import_sweep.py
+
+      - name: Upload tuvl artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-tuvl
+          path: dist/
+
+  build-insight:
+    name: Build tuvl-insight
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    needs: quality
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # UI assets are gitignored and built fresh below (bundle_ui.py) —
+          # this job only needs the source tree, not full git history.
+          fetch-depth: 1
+
+      - name: Stamp version from tag
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          # Same normalisation as build-tuvl — kept in sync.
+          TAG_VERSION=$(echo "${TAG#v}" | sed -E -e 's/-alpha\.([0-9]+)/a\1/' \
+                                                -e 's/-beta\.([0-9]+)/b\1/' \
+                                                -e 's/-rc\.([0-9]+)/rc\1/')
+          echo "Stamping version: $TAG_VERSION"
+          sed -i.bak "s/^version = .*/version = \"$TAG_VERSION\"/" pyproject.toml
+          sed -i.bak "s/^version = .*/version = \"$TAG_VERSION\"/" src/tuvl_insight/pyproject.toml
+          sed -i.bak "s/\"tuvl>=[^\"]*\"/\"tuvl>=$TAG_VERSION\"/" src/tuvl_insight/pyproject.toml
+          # the [standard] extra pins tuvl-insight to the same release (a beta needs
+          # tuvl-insight>=2.0.0b1 — 2.0.0b1 does not satisfy >=2.0.0)
+          sed -i.bak "s/\"tuvl-insight>=[^\"]*\"/\"tuvl-insight>=$TAG_VERSION\"/" pyproject.toml
+          find . -name '*.bak' -not -path './ui/node_modules/*' -delete
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        if: runner.environment != 'self-hosted'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up pnpm
+        if: runner.environment != 'self-hosted'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        if: runner.environment != 'self-hosted'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+          cache-dependency-path: ui/pnpm-lock.yaml
+
+      - name: Build UI and copy assets into tuvl-insight wheel
+        # scripts/bundle_ui.py runs `pnpm install --frozen-lockfile` + `pnpm
+        # run build` itself before copying dist/ into the wheel — a separate
+        # pnpm install/build step here would just compile the SPA twice.
+        run: python3 scripts/bundle_ui.py
+
+      - name: Build tuvl-insight
+        run: uv build --package tuvl-insight --no-sources
+
+      - name: Upload tuvl-insight artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-insight
+          path: dist/
+
+  # ── Stage 3: Publish tuvl first (tuvl-insight depends on it) ────────────────
+  publish-tuvl:
+    name: Publish tuvl to PyPI
+    needs: build-tuvl
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC Trusted Publishing — no API token needed
+
+    steps:
+      - name: Download tuvl artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-tuvl
+          path: dist/
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sign the files (PEP 740 attestations)
+        # uv publish uploads attestations that sit next to the files but does not create them;
+        # without them PyPI shows "Loss of provenance" on a project whose earlier releases had them
+        run: |
+          rm -f dist/*.publish.attestation
+          uvx pypi-attestations sign dist/*.whl dist/*.tar.gz
+
+      - name: Publish tuvl to PyPI
+        # uv publish speaks OIDC trusted publishing too; the pypa action is a Docker action a macOS runner cannot run.
+        # Pass dist/* (not *.whl and *.tar.gz): uv only attaches an attestation it finds in the list of files it is given.
+        run: uv publish --trusted-publishing always dist/*
+
+      - name: Check PyPI kept the provenance
+        # PyPI cannot add an attestation to a file after the upload, so a release without one stays without one
+        run: scripts/check_provenance.sh dist/*.whl dist/*.tar.gz
+
+  # ── Stage 4: Publish tuvl-insight after tuvl is live ────────────────────────
+  publish-insight:
+    name: Publish tuvl-insight to PyPI
+    needs: [build-insight, publish-tuvl]
+    runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
+    environment: pypi
+    permissions:
+      id-token: write  # OIDC Trusted Publishing — no API token needed
+
+    steps:
+      - name: Download tuvl-insight artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-insight
+          path: dist/
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sign the files (PEP 740 attestations)
+        # uv publish uploads attestations that sit next to the files but does not create them;
+        # without them PyPI shows "Loss of provenance" on a project whose earlier releases had them
+        run: |
+          rm -f dist/*.publish.attestation
+          uvx pypi-attestations sign dist/*.whl dist/*.tar.gz
+
+      - name: Publish tuvl-insight to PyPI
+        # uv publish speaks OIDC trusted publishing too; the pypa action is a Docker action a macOS runner cannot run.
+        # Pass dist/* (not *.whl and *.tar.gz): uv only attaches an attestation it finds in the list of files it is given.
+        run: uv publish --trusted-publishing always dist/*
+
+      - name: Check PyPI kept the provenance
+        # PyPI cannot add an attestation to a file after the upload, so a release without one stays without one
+        run: scripts/check_provenance.sh dist/*.whl dist/*.tar.gz

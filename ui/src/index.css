@@ -1,0 +1,305 @@
+@import "tailwindcss";
+
+/* xyflow base styles */
+@import "@xyflow/react/dist/style.css";
+
+/* ── Theme variables ────────────────────────────────────────────────────────── */
+
+/* Dark mode — default. No class needed; Tailwind's slate palette is natively dark. */
+:root {
+  color-scheme: dark;
+  /* YAML colorizer tokens (reference Tailwind's built-in CSS variables) */
+  --yaml-key:     var(--color-sky-400);
+  --yaml-str:     var(--color-emerald-300);
+  --yaml-num:     var(--color-violet-400);
+  --yaml-bool:    var(--color-green-400);
+  --yaml-null:    var(--color-slate-500);
+  --yaml-quoted:  var(--color-amber-300);
+  --yaml-list:    var(--color-slate-600);
+  --yaml-default: var(--color-slate-200);
+  --yaml-comment: var(--color-slate-500);
+}
+
+/* Light mode — add .light to <html> to activate */
+:root.light {
+  color-scheme: light;
+  /* Invert the slate palette (950→50, 900→100, …, 100→900) */
+  --color-slate-950: #f8fafc;
+  --color-slate-900: #f1f5f9;
+  --color-slate-800: #e2e8f0;
+  --color-slate-700: #cbd5e1;
+  --color-slate-600: #94a3b8;
+  /* slate-500 stays as the neutral midpoint */
+  --color-slate-400: #475569;
+  --color-slate-300: #334155;
+  --color-slate-200: #1e293b;
+  --color-slate-100: #0f172a;
+  /* YAML colorizer — darker shades for readability on a light background */
+  --yaml-key:     #0284c7;   /* sky-600   */
+  --yaml-str:     #059669;   /* emerald-600 */
+  --yaml-num:     #7c3aed;   /* violet-600 */
+  --yaml-bool:    #16a34a;   /* green-600  */
+  --yaml-null:    #64748b;   /* slate-500  */
+  --yaml-quoted:  #b45309;   /* amber-700  */
+  --yaml-list:    #94a3b8;   /* slate-400  */
+  --yaml-default: #1e293b;   /* slate-800  */
+  --yaml-comment: #64748b;   /* slate-500  */
+}
+
+
+/* ═══ tuvl theme: black, white and cyan — in step with tuvl.io and tuvl.dev ═══
+   Neutrals are zinc (near-black in dark mode, white in light mode). The accent
+   families sky / violet / indigo / teal are folded into cyan; status colours
+   (rose, red, amber, emerald) keep their meaning. Everything is a CSS variable,
+   so every existing utility class follows. */
+@font-face { font-family: 'Geist'; src: url('/fonts/Geist.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Geist Mono'; src: url('/fonts/GeistMono.woff2') format('woff2'); font-weight: 100 900; font-display: swap; }
+
+:root {
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  --color-slate-50: #fafafa;
+  --color-slate-100: #f4f4f5;
+  --color-slate-200: #e4e4e7;
+  --color-slate-300: #d4d4d8;
+  --color-slate-400: #a1a1aa;
+  --color-slate-500: #71717a;
+  --color-slate-600: #3f3f46;
+  --color-slate-700: #27272a;
+  --color-slate-800: #1c1c1f;
+  --color-slate-900: #111113;
+  --color-slate-950: #09090b;
+  --color-sky-50: #ecfeff;
+  --color-sky-100: #cffafe;
+  --color-sky-200: #a5f3fc;
+  --color-sky-300: #67e8f9;
+  --color-sky-400: #22d3ee;
+  --color-sky-500: #06b6d4;
+  --color-sky-600: #0891b2;
+  --color-sky-700: #0e7490;
+  --color-sky-800: #155e75;
+  --color-sky-900: #164e63;
+  --color-sky-950: #083344;
+  --color-violet-50: #ecfeff;
+  --color-violet-100: #cffafe;
+  --color-violet-200: #a5f3fc;
+  --color-violet-300: #67e8f9;
+  --color-violet-400: #22d3ee;
+  --color-violet-500: #06b6d4;
+  --color-violet-600: #0891b2;
+  --color-violet-700: #0e7490;
+  --color-violet-800: #155e75;
+  --color-violet-900: #164e63;
+  --color-violet-950: #083344;
+  --color-indigo-50: #ecfeff;
+  --color-indigo-100: #cffafe;
+  --color-indigo-200: #a5f3fc;
+  --color-indigo-300: #67e8f9;
+  --color-indigo-400: #22d3ee;
+  --color-indigo-500: #06b6d4;
+  --color-indigo-600: #0891b2;
+  --color-indigo-700: #0e7490;
+  --color-indigo-800: #155e75;
+  --color-indigo-900: #164e63;
+  --color-indigo-950: #083344;
+  --color-teal-50: #ecfeff;
+  --color-teal-100: #cffafe;
+  --color-teal-200: #a5f3fc;
+  --color-teal-300: #67e8f9;
+  --color-teal-400: #22d3ee;
+  --color-teal-500: #06b6d4;
+  --color-teal-600: #0891b2;
+  --color-teal-700: #0e7490;
+  --color-teal-800: #155e75;
+  --color-teal-900: #164e63;
+  --color-teal-950: #083344;
+  --color-blue-50: #ecfeff;
+  --color-blue-100: #cffafe;
+  --color-blue-200: #a5f3fc;
+  --color-blue-300: #67e8f9;
+  --color-blue-400: #22d3ee;
+  --color-blue-500: #06b6d4;
+  --color-blue-600: #0891b2;
+  --color-blue-700: #0e7490;
+  --color-blue-800: #155e75;
+  --color-blue-900: #164e63;
+  --color-blue-950: #083344;
+  --color-cyan-50: #ecfeff;
+  --color-cyan-100: #cffafe;
+  --color-cyan-200: #a5f3fc;
+  --color-cyan-300: #67e8f9;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;
+  --color-cyan-600: #0891b2;
+  --color-cyan-700: #0e7490;
+  --color-cyan-800: #155e75;
+  --color-cyan-900: #164e63;
+  --color-cyan-950: #083344;
+  --yaml-key: #22d3ee;
+  --yaml-num: #a5f3fc;
+  --yaml-str: #6ee7b7;
+}
+
+:root.light {
+  --color-slate-50: #09090b;
+  --color-slate-100: #09090b;
+  --color-slate-200: #27272a;
+  --color-slate-300: #3f3f46;
+  --color-slate-400: #52525b;
+  --color-slate-500: #71717a;
+  --color-slate-600: #a1a1aa;
+  --color-slate-700: #e4e4e7;
+  --color-slate-800: #f4f4f5;
+  --color-slate-900: #fafafa;
+  --color-slate-950: #ffffff;
+  --color-sky-50: #083344;
+  --color-sky-100: #164e63;
+  --color-sky-200: #155e75;
+  --color-sky-300: #0e7490;
+  --color-sky-400: #0891b2;
+  --color-sky-500: #06b6d4;
+  --color-sky-600: #0891b2;
+  --color-sky-700: #67e8f9;
+  --color-sky-800: #a5f3fc;
+  --color-sky-900: #cffafe;
+  --color-sky-950: #ecfeff;
+  --color-violet-50: #083344;
+  --color-violet-100: #164e63;
+  --color-violet-200: #155e75;
+  --color-violet-300: #0e7490;
+  --color-violet-400: #0891b2;
+  --color-violet-500: #06b6d4;
+  --color-violet-600: #0891b2;
+  --color-violet-700: #67e8f9;
+  --color-violet-800: #a5f3fc;
+  --color-violet-900: #cffafe;
+  --color-violet-950: #ecfeff;
+  --color-indigo-50: #083344;
+  --color-indigo-100: #164e63;
+  --color-indigo-200: #155e75;
+  --color-indigo-300: #0e7490;
+  --color-indigo-400: #0891b2;
+  --color-indigo-500: #06b6d4;
+  --color-indigo-600: #0891b2;
+  --color-indigo-700: #67e8f9;
+  --color-indigo-800: #a5f3fc;
+  --color-indigo-900: #cffafe;
+  --color-indigo-950: #ecfeff;
+  --color-teal-50: #083344;
+  --color-teal-100: #164e63;
+  --color-teal-200: #155e75;
+  --color-teal-300: #0e7490;
+  --color-teal-400: #0891b2;
+  --color-teal-500: #06b6d4;
+  --color-teal-600: #0891b2;
+  --color-teal-700: #67e8f9;
+  --color-teal-800: #a5f3fc;
+  --color-teal-900: #cffafe;
+  --color-teal-950: #ecfeff;
+  --color-blue-50: #083344;
+  --color-blue-100: #164e63;
+  --color-blue-200: #155e75;
+  --color-blue-300: #0e7490;
+  --color-blue-400: #0891b2;
+  --color-blue-500: #06b6d4;
+  --color-blue-600: #0891b2;
+  --color-blue-700: #67e8f9;
+  --color-blue-800: #a5f3fc;
+  --color-blue-900: #cffafe;
+  --color-blue-950: #ecfeff;
+  --color-cyan-50: #083344;
+  --color-cyan-100: #164e63;
+  --color-cyan-200: #155e75;
+  --color-cyan-300: #0e7490;
+  --color-cyan-400: #0891b2;
+  --color-cyan-500: #06b6d4;
+  --color-cyan-600: #0891b2;
+  --color-cyan-700: #67e8f9;
+  --color-cyan-800: #a5f3fc;
+  --color-cyan-900: #cffafe;
+  --color-cyan-950: #ecfeff;
+  --color-rose-50: #4c0519;
+  --color-rose-100: #881337;
+  --color-rose-200: #9f1239;
+  --color-rose-300: #be123c;
+  --color-rose-400: #e11d48;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #fda4af;
+  --color-rose-800: #fecdd3;
+  --color-rose-900: #ffe4e6;
+  --color-rose-950: #fff1f2;
+  --color-emerald-50: #022c22;
+  --color-emerald-100: #064e3b;
+  --color-emerald-200: #065f46;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+  --color-emerald-900: #d1fae5;
+  --color-emerald-950: #ecfdf5;
+  --color-amber-50: #451a03;
+  --color-amber-100: #78350f;
+  --color-amber-200: #92400e;
+  --color-amber-300: #b45309;
+  --color-amber-400: #d97706;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+  --color-amber-900: #fef3c7;
+  --color-amber-950: #fffbeb;
+  --color-red-50: #450a0a;
+  --color-red-100: #7f1d1d;
+  --color-red-200: #991b1b;
+  --color-red-300: #b91c1c;
+  --color-red-400: #dc2626;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+  --color-red-900: #fee2e2;
+  --color-red-950: #fef2f2;
+  --yaml-key: #0e7490;
+  --yaml-num: #155e75;
+  --yaml-str: #047857;
+  --yaml-default: #27272a;
+  --yaml-null: #71717a;
+  --yaml-comment: #71717a;
+  --yaml-list: #a1a1aa;
+}
+
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+code, pre, kbd, samp { font-family: var(--font-mono); }
+
+/* the logo: the dotted feather */
+.feather-mark {
+  display: inline-block; flex: none;
+  background: url('/tuvl-dotted-sm.svg') center / contain no-repeat;
+}
+
+/* ── YAML colorizer utilities ───────────────────────────────────────────────── */
+@utility text-yaml-key     { color: var(--yaml-key);     }
+@utility text-yaml-str     { color: var(--yaml-str);     }
+@utility text-yaml-num     { color: var(--yaml-num);     }
+@utility text-yaml-bool    { color: var(--yaml-bool);    }
+@utility text-yaml-null    { color: var(--yaml-null);    }
+@utility text-yaml-quoted  { color: var(--yaml-quoted);  }
+@utility text-yaml-list    { color: var(--yaml-list);    }
+@utility text-yaml-default { color: var(--yaml-default); }
+@utility text-yaml-comment { color: var(--yaml-comment); }
+
+/* ── Ensure the app takes full viewport height ─────────────────────────────── */
+#root {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-slate-950);
+  color: var(--color-slate-100);
+}

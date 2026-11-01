@@ -4,9 +4,591 @@ All notable changes to **tuvl** are recorded here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project follows [Semantic Versioning](https://semver.org) as of `1.0.0`.
-See `release-please-config.json` for the automation contract.
+Releases are cut by hand: `make bump VERSION=x.y.z`, update this file, tag `vX.Y.Z`.
 
 ---
+
+## [Unreleased]
+
+### Added
+
+- **Browser apps on another origin can call the API.** `spec.api.cors_origins` in `.tuvl/system.yaml` (or `TUVL_CORS_ORIGINS`, which wins) lists the origins allowed to call it. Nothing is allowed by default, including in dev, so existing servers behave as before. An origin is `scheme://host[:port]` with no trailing slash: `tuvl lint project` rejects anything else and warns on `*`, and the server leaves a malformed entry out. The middleware is the outermost one, so a preflight is answered before the IP allowlist or auth, and a `401` still carries the headers; it exposes `X-Tuvl-Run-Id`, which `@tuvl/client` reads, and sends no credentials mode (tokens are bearer headers). `tuvl generate ui-spec` says in its backend-surface section whether a browser may call from another origin.
+- **Five skills for building the UI with `@tuvl/client`.** `tuvl-ui` is the starting point (read `ui/specs/`, install the client and generate the types, let the browser reach the backend (an allowed origin or one shared origin), one screen per workflow, every status handled); `ui-run` starts and follows a run (`execute`, `RunHandle`, events, live drafts, errors), `ui-approve` answers human forms and tool-call approvals, `ui-auth` covers sign-in, token storage and refresh, and `ui-data` covers `crud()`, file uploads and server-side webhooks. `tuvl init` and `tuvl update skills` install them with the others, and every code block in them is typechecked against the published client.
+- **An idea can come from a link.** `tuvl import idea --url <link>` (repeatable, and mixed with files) saves a Markdown snapshot of a web page,
+  a Jira issue, a Confluence page or a GitHub issue or pull request as an ordinary idea file; `IDEA.yaml` records the link, its kind and when it
+  was fetched, and Insight's upload dialog takes links one per line. Jira and Confluence read `TUVL_ATLASSIAN_EMAIL` + `TUVL_ATLASSIAN_TOKEN`
+  (Cloud) or `TUVL_ATLASSIAN_PAT` (Server / Data Center), GitHub reads `TUVL_GITHUB_TOKEN`; credentials go only to Atlassian Cloud, the hosts in
+  `TUVL_ATLASSIAN_HOSTS` and `api.github.com`, and never into the idea. Requests use the webhook address guard: internal addresses and plain
+  `http` are refused unless `--allow-private`, the connection is pinned to the address that was checked, and redirects are checked at every hop.
+  The spec prompt marks a snapshot with its source and tells the agent that an idea is material to specify, not instructions (the same rule is
+  in the `tuvl-spec` skill), because a page or ticket can be edited by anyone.
+- **`tuvl init` asks for the coding agent with a menu.** Up and Down (or `j` and `k`, or a number) move and Enter chooses, instead of typing
+  an id. Each agent says whether tuvl can draft and build with it. Without a terminal (a pipe, CI, a coding agent) `init` asks in plain text
+  as before.
+
+### Changed
+
+- **Antigravity CLI can draft specs and build tasks, not only review.** tuvl runs it with `--mode accept-edits`, which approves file edits inside
+  the working folder and denies a shell command or an edit outside it (checked on `agy` 1.4.10); a review runs without the mode. When agy
+  denies a tool it still exits `0`, so tuvl now reports the denied tool.
+
+### Fixed
+
+- **Settings → Project shows the project record again.** `GET /dev/project` was answered by the project summary, so the project
+  id, author and email never reached the Settings page. The summary now lives at `GET /dev/project/summary`; `/dev/project` is
+  the record (GET and PUT). A test fails if two routes share a method and path.
+- **Memory lookups use their index.** `recall`, `forget` and `compact` now carry the `metadata ? 'memory_key'` predicate that
+  the partial index `ix_svs_memory_key` requires, so Postgres no longer scans the whole vector store.
+- The `SystemRunCheckpoint` docstring said checkpoints are redacted; they are stored unredacted (resume state) and redacted on
+  export. Removed the unused `DeltaStream._wake`.
+- **`tuvl run tests` no longer flakes on `map`, `parallel` and batched loop tools.** The offline database shared one
+  transaction between every session, so one session's rollback could undo another's journal sequence number and the run
+  crashed on `UNIQUE constraint failed: tuvl_system_run_events.run_id, seq` (reported as `run ended running: None`). The
+  offline database now runs in autocommit. Offline tests therefore keep an agent's writes where Postgres would roll them
+  back (an error outcome, a retried attempt, a `per_run` rollback).
+
+### Documentation
+
+- **Contributing and security, for a public repository.** `CONTRIBUTING.md` says when to open an issue first, how a pull request
+  lands (the source is published as tagged release snapshots) and asks for a `Signed-off-by` line under the new `DCO` file;
+  the PR template has the sign-off box; `SECURITY.md` offers GitHub private vulnerability reporting; the code of conduct
+  names `developer@tuvl.io` instead of a personal address; the README no longer says development is private; the
+  Discussions link is gone (the feature is off).
+- **A complete option reference, generated from the CLI.** `docs/cli-reference.md` lists every command and every option with its value, default and
+  description (62 commands), written by `python scripts/gen_cli_reference.py` and checked by a test, so a new option cannot be missing from the docs.
+  `docs/cli.md` gains the rows and options it was missing (`verify lock`, `verify ui-spec`, `import idea --commit`, `check storage --json`,
+  `list objects --limit`), and `tuvl init --help` and `tuvl dev --help` now say what they do.
+- `CONTRIBUTING.md`, `AGENTS.md`, `README.md` and `SECURITY.md` match 2.0: the real source layout, all nine engines (`map`
+  and `parallel` included), validation codes V001–V043, Python 3.13–3.14, and 2.x as the only supported line. A test keeps
+  the engine lists in README and AGENTS in step with the schema.
+- The source maps in `AGENTS.md` and `CONTRIBUTING.md` show the split `api/dev/` and `validate/workflow/` packages and the new runtime modules, and both
+  describe `scripts/bench_steps.py`. `api.md` says how soon the event stream sees a commit, `runtime.md` how the system indexes are built at boot, and
+  `storage.md` where a local store keeps `sha256`. The `tuvl-test` and `agent-tool` skills say that the offline test database autocommits and that MCP
+  sessions are reused.
+
+### Removed
+
+- `make publish`: releases are published by CI (`.github/workflows/publish.yml`, with PEP 740 attestations), never from a laptop.
+
+### Performance
+
+- **`tool` agents with `use: mcp` reuse their MCP session.** A worker keeps one session open per tenant and server instead of
+  starting a stdio server and running the MCP handshake on every call. A change to the server's artifact or to an environment
+  variable it reads opens a new session, a dead server is replaced on the next call, and an unused session closes after
+  `TUVL_MCP_IDLE_SECONDS` (default 300; `0` restores a session per call). Sessions close at shutdown.
+- **Run event streams wake on commit instead of polling every 250 ms.** A journal event, a run leaving `running`, or a draft piece
+  committed in the same process wakes `GET /api/runs/{id}/events` at once; a 1 s poll covers writes from other worker processes.
+  An idle stream now costs about one query batch a second instead of four.
+- **New indexes:** `tuvl_system_run_deltas (created_at)` for the draft sweep, and a partial index for agent memory's per-step lookup
+  (`remember`), whose query now carries the matching `metadata ? 'step'` predicate.
+- **Indexes on large system tables are built concurrently at boot.** The new indexes and the vector store's existing ones are created
+  with `CREATE INDEX CONCURRENTLY IF NOT EXISTS` outside any transaction, so upgrading a deployment with a large table does not block
+  writes. One process builds them (an advisory lock; others skip), and an index left invalid by an interrupted build is rebuilt. The
+  booting process waits for the build to finish.
+- **Uploads hash each file once.** The upload handler reuses the digest `store.put()` computes, and the local store keeps `sha256` in
+  `.meta/<key>.json`, so `head` and `list` no longer re-read every file. Files written by older versions are hashed as before.
+- The judge verdict cache and the dev file listing (`GET /dev/files`) no longer do file I/O on the event loop.
+- **Less work per agent step.** The runner hashes the workflow and looks up a child run's depth once per run load instead of on every
+  step; parsed TEL expressions, templates and type strings are cached; the helper models the `llm`, `loop` and `tool` engines build
+  (structured-response, tool-argument and finish models, `where` type adapters) are built once per agent. A reloaded project gets new
+  objects, so nothing built against the previous registries is reused.
+- **Model calls reuse connections.** `tuvl.llm` keeps one pooled HTTP client per event loop (timeouts are per request) instead of
+  opening a client, and its DNS, TCP and TLS handshakes, for every completion, stream and embedding.
+- **Webhook deliveries reuse connections, without weakening the address check.** Clients are pooled per scheme, host name, checked
+  address and port, so a connection is only reused for the name its certificate was verified for and the address checked on that
+  attempt; every delivery still resolves and checks the name first. A short response body with a declared length is now drained and
+  dropped so its connection can be reused.
+- `scripts/bench_steps.py` measures runs/s, steps/s, step latency and SQL statements per step against Postgres with a stubbed model.
+- **Fewer database round-trips per agent step** (11.8 → 8.8 SQL statements per step on the benchmark, one transaction fewer).
+  Completing a step takes the lease fence, the run-row update and both journal sequence numbers in one `UPDATE … RETURNING`.
+  Outside dev mode, the operator-control check (pause, abort) is read in the same statement and transaction that journals
+  `agent_started`, instead of in a separate transaction before it; dev mode keeps the separate check, because breakpoints are
+  checked between the two. `journal.allocate_seqs` allocates several sequence numbers at once; `append_event` and
+  `write_checkpoint` accept a number allocated that way. With webhooks enabled, the journal no longer loads the run row to find its
+  workflow when the runner already knows it, or when no loaded workflow declares webhooks.
+- Under `transaction: per_run`, a worker that has lost its lease no longer journals `agent_completed` for the step it was running.
+
+
+### Changed
+
+- Internal refactor, no behaviour change: `tuvl.api.dev` and `tuvl.validate.workflow` are packages split by area (same router,
+  routes, OpenAPI document, public names and diagnostics); Insight shares one `YamlPanel` and `RunWithAgent` reuses `JobOutput`.
+- Insight's `react-hooks` lint warnings are fixed and ESLint warnings now fail CI (`--max-warnings 0`, no longer advisory).
+
+
+## [2.0.0-beta.10] — 2026-10-26
+
+**Answers that stream, steps that run side by side, agents that remember.** Everything below is checked by the validator, journaled,
+and covered by tests; none of it changes a workflow that does not use it.
+
+- **An `llm` agent can show its answer while it is written.** `llm: { stream_tokens: true, stream_field: draft }` sends the text of one
+  `str` output to the run's event stream (`token_delta`) as the model produces it; the agent's result, validation, token count and
+  retries are unchanged, and `token_reset` tells a client to drop the draft when the answer is rejected or the agent runs again.
+  `stream_field` can be left out when there is one `str` output. It is refused with `guardrails.output` (V039), because text a guardrail
+  could still refuse must not be shown.
+  - **The event stream carries drafts only when asked.** `GET /api/runs/{id}/events?drafts=true` adds `token_delta` / `token_reset`
+    frames (no `id`, not journal events, not replayed or exported); without it the stream is exactly the journal, so existing clients are
+    unchanged. A client that connects mid-agent first gets the draft so far (`replay: true`). A worker writes drafts in batches of about
+    100 ms to a new table, `tuvl_system_run_deltas`, created on first start; a sweep removes a finished run's drafts after a minute.
+  - **The model client can stream.** `tuvl.llm.astream` takes the same arguments as `acompletion` and yields `TextDelta` events, then
+    one `StreamEnd` with the same `Completion` a non-streaming call returns. It covers the OpenAI-compatible providers (OpenAI, Gemini,
+    Ollama, Groq, Mistral, vLLM and any gateway) and Anthropic. `timeout` is the longest silence between chunks.
+  - **Insight and `@tuvl/client`.** The run view shows the live draft under the running step and drops it when the step completes.
+    `RunHandle.onToken(listener, { onReset })` (and `tokens()`, `stream()`, `runs.tokens`, `runs.stream`) in `@tuvl/client` ask for drafts;
+    `events()` never receives them.
+
+- **New engine `parallel`: different read-only agents at the same time.** One step runs 2-16 branches (db reads, http GET, storage reads,
+  `llm`, `code` with `effect: read`) together and joins their outputs, so the step takes as long as its slowest branch. `on_error: fail`
+  stops the rest at the first failure; `collect` lets all finish and emits `partial`. Each branch has its own database session and
+  idempotency key, the step's `budget.timeout` cancels every branch, and a worker killed mid-fan-out is resumed on another worker.
+  - The journal gets `parallel_started`, `parallel_branch` and `parallel_finished`, and a branch's own events carry `branch`. The
+    worst-case tokens are the sum of the branches. Offline tests mock each branch by id (or the whole step); `tuvl generate code` writes
+    stubs for `code` branches.
+  - New checks V040 (branches only read), V041 (inputs and outputs line up), V042 (not under `transaction: per_run`).
+  - Insight has a **Run lookups in parallel** preset, a card, and branch badges in the run timeline; the `agent-parallel` skill covers it.
+
+- **A loop runs the read-only tool calls of one model turn at the same time.** When a turn asks for several MCP tools marked
+  `readOnlyHint` that need no approval, they run together; events and the transcript keep the order the model asked in, and
+  `max_tool_calls` / `max_calls` count as before. Writes, approvals and agent, workflow and collection tools still run one at a time.
+
+- **Agents can remember across runs.**
+  - `llm: { memory: { collection, key, window, recall_top_k, max_tokens, write, retention } }` (and the same block on `loop`) puts the
+    owner's latest memories and related older ones in the prompt, fenced as data, and stores the `write` fields after a successful run,
+    once per step. The owner is the signed-in principal, the tenant, or an input (refused on a public trigger, V043); the model never
+    chooses it, and every read and write is filtered by it in the query. `write` can never include secure fields (V043), unknown
+    collections are V014, and the recalled tokens count towards `policy.max_tokens_per_run`. Journal events `memory_recalled` and
+    `memory_written`.
+  - The built-ins `tuvl.memory_remember` and `tuvl.memory_recall` do the same from a `code` step; `tuvl.memory_compact` (run it from a
+    scheduled workflow) folds each owner's older memories into one model-written summary and deletes the originals in one transaction.
+  - `retention: 90d` makes the runtime delete older memories (checked every five minutes). `tuvl prune memory <collection> --key <owner>`
+    erases one owner's memories and `--older-than 30d` erases old ones; both report how many rows went and touch nothing else.
+  - `tuvl_system_vector_store` rows now carry `created_at` (added to an existing table at startup, indexed) and there is an index for
+    reading one owner's rows by time.
+  - Insight has a **Memory** page (collections, each owner's memories with the agent and run that wrote them, **Forget** for one memory or
+    one owner) and a **Remember across runs** section in the agent panel; the dev API has `GET /dev/memory`, `GET /dev/memory/{collection}`
+    and `DELETE /dev/memory/{collection}?key=` / `.../{id}`.
+
+- **The coding-agent skills cover what b8 and b9 added.** A new skill, `tuvl-workflow`, covers the workflow document around the agents:
+  triggers (http, schedule with `input` and `enabled`, mcp), **file uploads** (`upload`, `file` inputs, the reference a run receives,
+  V037), ends and `rollback`, `policy`, **webhooks** (`spec.webhooks`, V038, off unless `TUVL_WEBHOOKS_ENABLED=true`) and per-signal
+  outputs. `agent-loop` describes the `collection:` tool and `loop.memory`, `agent-llm` streaming and memory, `agent-code` the `file`
+  reference (`ctx.read_file`) and the settings of `tuvl.data_search` and `tuvl.data_ingest`, `agent-tool` reading an uploaded file, and
+  `tuvl-ship` the webhook switch and the review step of the gate. `tuvl update skills` adds the new skills to existing projects.
+
+## [2.0.0-beta.9] — 2026-10-24
+
+- **Insight's agent panel picks the AI model, and shows the agent as YAML.** An `llm` or `loop` agent's tab (Prompt / Loop) now has an
+  **AI model** dropdown of the models configured on the AI Models page (or a `provider/model` id of your own), with the system prompt
+  and prompt as fields; a `decide` agent's decision model is the same dropdown, limited to decision models. A new **YAML** tab holds the
+  whole agent as it is in the workflow file, editable; its id cannot change there, because routes point at it.
+  The same panel also uses the artifacts stored in the project: the system prompt, prompt and steering can each be written there or
+  taken from a stored artifact (pinned to a version), an `llm` or `loop` agent lists its skills, and a loop lists the MCP servers it may
+  call with their allowed tools and the judge that supervises it.
+
+
+- **Upload an idea and generate a spec from Insight.** The Ideas page has **Upload idea** (files, a folder or text; the result is
+  what `tuvl import idea` makes, numbered from your initials, with a title, an optional "replaces" and an optional commit) and, on
+  each idea, **Generate a spec with my agent**, which runs `tuvl generate spec --idea` with your coding agent, shows its output
+  and asks for consent the first time. The draft is written into the project uncommitted, or onto a `spec/<id>` branch with nothing
+  pushed. The dev API has `POST /dev/ideas` and `POST /dev/ideas/{id}/spec`, and `GET /dev/ideas` now also says who you are
+  (`me`: your initials, your agent, whether you consented).
+
+
+- **Collections in workflows.** A loop agent can search a collection as a tool: `- collection: kb_docs` (with optional `top_k`, `filter`
+  and `scope`) is offered to the model as `search_kb_docs(query)`, a read that needs no approval; `tuvl lint project` checks the
+  collection exists, and the same check now covers the `collection` of `tuvl.data_search` and `tuvl.data_ingest`. In Insight those two
+  steps pick their collection from the configured ones (with its embedding, and a warning when pgvector is missing), a loop lists the
+  collections it can search, and **Retrieve and answer** adds a search step routed into an answering step that cites its sources.
+
+
+- **Releases carry PyPI provenance again, and fail when they do not.** 2.0.0b4 to b8 were published without it: the signed attestations
+  sat beside the files but `uv publish` was given a list that left them out. It now uploads them, and the release job checks PyPI
+  for every file afterwards. Provenance cannot be added to a release later, so b4 to b8 stay without it.
+
+## [2.0.0-beta.8] — 2026-10-22
+
+- **The terminal UI draws the dotted feather.** The banner and the side panel show the logo's dot lattice, every other dot, so the
+  dots read as points like the logo in Insight. The browser-tab icon of Insight is dotted too.
+
+
+- **The public catalogue is Nest, at `nest.tuvl.io`.** `tuvl project register` and Insight's Register dialog default
+  to it; `--nest URL` or `TUVL_NEST_URL` point at a self-hosted one, and the login is cached in
+  `~/.config/tuvl/nest.json`.
+
+- **A synchronous request no longer answers `202` for a run that is about to finish.** When the background worker claimed a
+  freshly queued run before the HTTP request could, the request returned the run still `running`, so a caller that
+  expected the end's status and body (a registration that returns a token) got a `202` descriptor instead. The request now
+  waits for that run, up to `sync_timeout`.
+
+- **Developer telemetry (optional).** Share what developers do on a project through a collector the team runs, and see what
+  the others did. Every audit event (ideas, specs, approvals, tasks, agent attempts, branches, commits, pull requests,
+  gates, ships) and one `cli.command` event per command (no arguments) is queued locally and sent in the background;
+  a collector that is down only delays delivery and a command never waits on it. Off by default; turned on at `tuvl init`
+  (`--dev-telemetry URL` or the prompt), with `tuvl set dev-telemetry URL` or in Insight → Settings → Developer telemetry;
+  the setting is `.tuvl/dev-telemetry.yaml` (commit it). Each developer registers once at the collector with the team's join
+  code (`tuvl register developer`) and gets a token of their own, kept in their own config folder, never in the project; the
+  token sends and reads. Insight shows the team: the Audit page's **Team** view, **Team activity** in a task, and who built
+  each branch; `tuvl list team-activity` does the same in a terminal. `tuvl show dev-telemetry` and `check dev-telemetry`
+  show and test it. The default identity is initials only. It is development only: `tuvl ship` also refuses the config,
+  `.tuvl/audit/`, `.tuvl/trace/`, `.tuvl/live/`, `.tuvl/worktrees/` and `.tuvl/agent.yaml` if a `.dockerignore` lets them into
+  the image (V027). The collector we provide is the separate Tuvl Flightlog (Apache 2.0; a Python service for SQLite or PostgreSQL, and a tuvl project for PostgreSQL); the contract is in
+  `docs/dev-telemetry.md`, so any server can stand in. A company's own certificate authority is set with
+  `TUVL_DEV_TELEMETRY_CA`, and `tuvl set dev-telemetry --rotate-token` replaces a token.
+
+- **Specs are approved, and tasks are worked, in Insight and the terminal UI.** Insight's Specs page has
+  **Approve**, **Send back…**, **Reopen** and **Derive tasks** (the same commands as the terminal, with the
+  same audit entries); the terminal UI has the same actions. A task opens in a floating panel that drags,
+  resizes, pops out into its own window and reads as Markdown: what it builds, why it is blocked or not done,
+  what it waits for and the spec section it came from. `tuvl show task <id>` prints the same in the terminal,
+  and the terminal UI shows it too. **Graph** draws a spec's tasks as a dependency tree, top to bottom in
+  execution order (tasks that do not depend on each other share a step), coloured by done, running, failed,
+  blocked, in progress and ready.
+
+- **Branches have a dashboard.** `tuvl list branches` and Insight's **Branches** tab show the spec's work as a tree of
+  what grew from what (spec, scaffold, one branch per agent task; branches built apart sit side by side and are
+  marked parallel; a branch lists its commits and messages): merged (even when the branch was deleted after the
+  merge), open (commits ahead and behind, last commit, pull request) or not built, which one to merge next and the
+  command for it. tuvl still never merges. A second scaffold run on an unmerged scaffold branch says so instead
+  of "Nothing to scaffold".
+
+- **A blocked task says why, and cannot be run.** The reason names what it waits for and the state of each
+  (`blocked: waiting on TASK-… Order model (todo)`, each dependency once). `Run with my agent` is disabled for a blocked task and
+  the server refuses it; only agent tasks are run with the agent (models and workflows come from the scaffold:
+  Insight offers `Generate the scaffold`, which runs `generate code --no-agent`). `list tasks --json` gains
+  `depends_on`, `waiting_on`, `live` and `failure`.
+
+- **A failed task run keeps a report of every attempt.** For each attempt: the check it failed (the coding
+  agent did not finish, it changed files outside the task, the project did not validate or the step was not
+  implemented, the review found blocking problems), the problems, the agent's exit code and the end of its
+  output. It is shown in Insight (**Why it failed**), by `generate code` (`full report: tuvl show task …`), by
+  `show task`, `list tasks` and the terminal UI, and kept until the task succeeds. A command started from
+  Insight that fails ends with its exit code and the errors it logged instead of nothing.
+
+- **`generate spec --here` writes the spec into your working tree** (no branch, no pull request), and
+  `generate code` carries a spec and task list that were never committed on the scaffold branch. Spec
+  commands accept the id (`SPEC-SR-0001-04`) as well as the path. The terminal UI selects with the mouse
+  and copies, moves between actions with the arrow keys, and ends each command with a highlighted token line.
+
+- **The tagline is "Intelligent Workflows. Deterministic Execution."** in the CLI help and banner, the terminal
+  UI, Insight and the documentation; the banner and terminal UI show the Malayalam name തൂവൽ (feather).
+
+
+- **Commands are actions: `tuvl <verb> <thing>`.** The pipeline reads in order: `init`, `import idea`,
+  `generate spec --idea`, `approve spec`, `generate tasks --spec`, `generate code --spec|--task`, `verify spec`,
+  `review code --spec|--task`, `run tests`, `ship`. Each verb makes one promise: `generate` writes files, `lint`
+  runs static rules (zero tokens), `verify` asks whether one thing is still in step with another (exit 1 on
+  drift), `check` asks whether something works right now, `list`/`show` only read. `validate` is
+  `lint project`, `doctor` is `check system`, `codegen` is `generate code`, `lock` is `generate lock` and
+  `lock --check` is `verify lock`, `test` is `run tests`, `ui spec` is `generate ui-spec`, `spec …`, `runs …`,
+  `audit …`, `agent …`, `project …`, `keys`, `db`, `storage`, `skills`, `mcp` moved under their verbs (the
+  table is in `docs/cli.md`). `review code --spec` / `--task` reviews only the code agents those tasks created.
+  There are no aliases for the earlier names; `--json` shapes are unchanged. Files tuvl generated mention
+  the new names, so run `tuvl generate code` and `tuvl generate ui-spec` once after upgrading.
+
+- **Agent commands report their token use, and the terminal UI is easier to use.** Every command that ran a coding agent ends with a `tokens · … in · … out · $…` line (Claude Code reports tokens; other agents are named as not reporting). In `tuvl dev`'s terminal UI the project actions are listed under every selection, `c` copies the output, and each command ends with its token line (or "none used"). `tuvl init` now creates `idea/` and `specs/`, and `create spec` says `Created specs/<id>.md` on one line.
+
+- **The production server shuts down cleanly and is easier to run behind a proxy.** `tuvl serve app` now replaces its own process with uvicorn instead of running it as a child, so a container's
+  SIGTERM reaches uvicorn: open requests finish (`--graceful-timeout`), running runs get `--drain-timeout`
+  seconds, then the rest are interrupted and resumed by another worker from their checkpoint. New
+  `--forwarded-allow-ips` (so `--allow-host` and logs see the real client behind an ingress),
+  `--limit-max-requests`; the `Server` header is off. The Helm chart gains a termination grace period, a
+  `preStop` pause, `forwardedAllowIps`, `limitMaxRequests` and a hardened `securityContext` (non-root, no
+  privilege escalation, capabilities dropped, seccomp; `readOnlyRootFilesystem` opt-in); the image's start
+  command is `tuvl serve app`.
+
+
+- **Webhooks.** A workflow declares `spec.webhooks` (`name`, `url`, `secret`, `events`, `stages`) and the engine
+  sends a small signed HTTPS notification when a run completes, fails, aborts, waits for a person or finishes a
+  named agent. The notification carries only a run id and what happened; the receiver pulls the run with its
+  own token. Targets come from the workflow and the environment, never from a caller. Security: HMAC-SHA256
+  signature with a timestamp, secrets only as `${ENV}` references (rotation with `previous_secret`), `https`
+  only, internal and numeric-trick addresses refused when declared and again after resolving (every address, the
+  connection pinned to the checked one), no redirects, no proxies, no response read, a fixed request, a circuit
+  breaker. Delivery is a transactional outbox, at-least-once with backoff; off unless
+  `TUVL_WEBHOOKS_ENABLED=true`. `GET /api/runs/{id}/webhooks` and `.../redeliver`; V038 in `tuvl validate`.
+  `@tuvl/client` is the supported receiver (`verifyWebhook`, `webhookHandler`).
+
+
+- **A production server exposes only what it needs, and the API documentation lists only your workflows.** `spec.api.expose` (or `TUVL_API_EXPOSE`) chooses which system route groups a production server mounts: `auth` by default; `admin` (`/admin/*`), `artifacts` and `system` (`/api/_system/*`) are mounted only when you ask. `runs` (starting, following and approving runs) is always mounted, in dev and production, and cannot be switched off. `spec.api.docs` (or `TUVL_API_DOCS`) is `off`, `workflows` or `all`: `/docs`, `/redoc` and `/openapi.json` are off in production by default and, where they are on, list your own workflow and model routes without the system ones. The dev server mounts every group as before and its documentation hides the system routes; `spec.api.dev_expose_all: false` (`TUVL_DEV_EXPOSE_ALL`, or Insight's Settings → API Access) makes it mount only what production would. Insight's API Access page also edits the production groups and the documentation mode. `tuvl generate ui-spec` now writes a Backend surface section (the groups and documentation mode of a production server), says which of a workflow's two start routes suits which caller, and tells UI builders never to call `/api/_system`, `/admin` or `/api/artifacts` unless listed. **Breaking for production deployments** that call `/admin/*`, `/api/artifacts` or `/api/_system/*`, or read `/docs`: add them to `spec.api.expose` or `spec.api.docs`.
+
+- **`TUVL_BISCUIT_PRIVATE_KEY` is no longer read.** The 1.x name for the signing key was accepted with a
+  warning; only `TUVL_SIGNING_KEY` sets the key now (same format: 64 hex characters). Without it the
+  server refuses to start in production and uses an ephemeral key in development. `tuvl keys generate
+  --write --force` no longer looks for the old line.
+
+
+- **mypy is clean across all of `src/` (0 errors in 218 files) and CI gates on it.** Fixing it found two
+  bugs: `GET /models/{model}/{id}?include=…` failed for any model with relations (the record was passed
+  where a list was expected), and the `pii_mask` guardrail raised on JSON content whose top level is a
+  list instead of masking it.
+
+- **File uploads.** New `file` type and `http.upload` on a trigger: the route accepts
+  `multipart/form-data`, stores each `file` / `list[file]` input in a named store (S3, Azure, GCS or local)
+  under a generated key, and the run receives a reference (`store`, `key`, `name`, `size`,
+  `content_type`, `sha256`), never the bytes. The caller is authenticated before the body is read, size and
+  count limits apply while it streams, a content-type allow-list is available, and a JSON body cannot name
+  a file (so a reference cannot be forged). `POST /api/workflows/{name}/runs` takes the same multipart body.
+  `tuvl validate` adds V037; OpenAPI describes the multipart body; `tuvl codegen` types it; a code agent reads
+  it with `ctx.read_file`; `tuvl ui spec` documents it; Insight's Run form and trigger panel handle it.
+  `@tuvl/client` sends a multipart body when an input is a `File` or `Blob`.
+
+
+- **Code-quality pass.** Removed dead code (13 unused functions and constants, the `core/errors.py`
+  module, the 1.x skill files under `.agents/`, a 2 MB logo shrunk to 56 KB); `tuvl` now declares
+  `cryptography`, which it imports directly; the mypy gate covers about 150 files (was about 85).
+
+- **Security: a failed create-user insert no longer returns the database driver's message**, which can
+  include the failing row (the password hash). It is logged; the response says only that a database
+  error happened.
+
+- **CRUD list filters are checked.** `filter[field]=…` on an unknown field used to be ignored and return
+  every row; it now answers `422`, as does a filter on a `secure` field.
+- A corrupt `.dev-session` file no longer crashes `tuvl dev`; model versions sync in one query at startup.
+- The package classifier says Beta until 2.0.0 is released.
+
+
+- **Schedule and API triggers are switchable, and scheduled runs carry input.** `trigger.schedule`
+  accepts `{ cron, enabled, input }` (the cron string still works) and `trigger.http` accepts
+  `enabled: false` to keep its settings without mounting the route. Scheduled runs used to start with an
+  empty input, so a workflow with required fields could never run on a schedule; `schedule.input` fixes
+  that and `tuvl validate` checks it against `trigger.input` (V019). Insight's Start panel gets **API** and
+  **Schedule** checkboxes, a cron check with the next fire times, an input field per trigger input, and the
+  scheduler's status. New dev endpoints `GET /dev/schedule/preview` and `GET /dev/schedules`; the admin
+  workflow list reports `api_enabled` and `schedule_enabled`.
+
+## [2.0.0-beta.7] — 2026-10-20
+
+- **`tuvl ui spec` writes the UI integration guidelines.** `ui/specs/` (scaffolded by `tuvl init`) tells the
+  developers and coding agents who build the frontend how to use the backend, and recommends `@tuvl/client`:
+  an index, a file per workflow whose tasks are done (endpoint, auth, request, every end's status and body,
+  the run lifecycle, approval forms, real examples, snippets, a checklist), a file for models with CRUD
+  routes, and `ui-contract.json`. Zero tokens; `codegen --spec` adds a workflow's file with the task that
+  completes it; `--check` detects drift; notes below the marker are kept. New audit event `ui.spec.generated`.
+
+- **More coding agents, and a page on authoring with them.** Codex CLI and Gemini CLI can now draft
+  specs and build tasks like Claude Code (their sandbox / `auto_edit` mode confines writes to the
+  folder); Cursor, Antigravity, Copilot CLI and Amp can review code through `tuvl review --agent` but are
+  never given write access, because their headless modes cannot limit it to one folder. `tuvl agent
+  list` shows which is which, and `tuvl agent test` checks yours. New `docs/authoring.md` describes the
+  driven path end to end (what an agent may do, what tuvl enforces, what is committed).
+
+- **`tuvl dev` starts a terminal UI on a terminal.** A tree of ideas, specs and tasks (with live
+  `codegen` progress), the actions for what you select, and three logs (command, engine, audit). It is
+  a launcher: every action runs the `tuvl` command you would type, so the gates and the audit trail are
+  the same; actions that spend your agent's tokens or are hard to undo ask first. `--no-tui`, or no
+  terminal, keeps the old behaviour. New extra `tuvl[tui]` (Textual), in `tuvl[standard]`.
+
+- **Insight shows the authoring trail, read-only.** A new **Ideas** page (each idea's files with a text
+  preview, the specs drawn from it and their approval), an **Audit** page (the local ledger with filters,
+  live polling, event JSON and a chain-integrity badge), and on **Specs** an approval badge per tile and
+  a pipeline strip idea → spec → tasks. Behind them: `GET /dev/ideas`, `/dev/ideas/{id}`,
+  `/dev/specs/lifecycle` and `/dev/audit` (dev mode only).
+
+- **`tuvl ship` runs the deterministic gate and can write a runnable archive.** Before packaging it
+  checks that every spec under approval is approved and unchanged, `spec check` and `spec verify`
+  have no errors, every task is done, generated files are current, the agents' Python has no C-rule
+  errors, `uv.lock` is current and the git tree is clean (`--allow-incomplete`, `--allow-dirty`). The
+  image is labelled with a hash of its runtime files and the git commit. `--format archive|both`
+  writes `dist/<name>-<version>.tar.gz` (or `--archive-format zip`) plus a `.sha256`: the runtime files
+  with `run.sh`, `RUN.md`, `.env.example` and `BUILD-INFO.json`, byte-for-byte reproducible, to run
+  with `uv` on a host without Docker. `--no-build` is now `--no-image` (the old name still works).
+
+- **`tuvl review`: the Python of code agents, checked.** Free rules first (C001–C012: shape, processes,
+  direct network, environment, file writes, non-determinism, module state, hard-coded URLs, secrets,
+  unrouted signals, writes in a read agent) plus `ruff`; errors fail, warnings with `--strict`.
+  `--agent` adds a second opinion from a coding agent that cannot change anything and must answer in
+  JSON; it is advisory unless `--blocking`, and `--post` puts it on the pull request. `codegen --spec`
+  reviews each task's Python before committing (`--review static|agent|none`). New skill `tuvl-review`.
+  `tuvl init --ci github|gitlab` writes the deterministic gate as CI.
+
+- **`tuvl codegen --spec`: build a spec's models and workflows from its tasks.** Deterministic part
+  first (no tokens): the missing models from `# Data`, a workflow skeleton of `pending` steps from
+  `# Flows`, then the generated files, on a `feature/<spec>-scaffold` branch. Then your coding agent
+  implements one pending step per task, each on its own `feature/TASK-…` branch stacked on the
+  previous one, limited to the workflow, `agents/*.py` and `artifacts/`; a task is accepted only when
+  `validate` and `spec verify` agree, and failures are fed back. Pull requests are opened as drafts
+  and never merged. `tuvl codegen` without `--spec` is unchanged.
+- **Fixed:** `spec verify` no longer reports a route the spec *waives* (`- conflict: waived — …`) as
+  one the spec doesn't have, although `validate` requires it. `tuvl validate` no longer calls
+  `idea/INDEX.yaml` and `idea/*/IDEA.yaml` unknown kinds. `tuvl spec gen` titles its commit with the
+  spec's title.
+
+- **`tuvl spec gen`: a coding agent drafts a spec from an idea.** tuvl numbers the spec, works on a
+  `spec/<id>` branch in a worktree, lets the agent change only that spec file (anything else is
+  reverted and fed back), re-imposes the lifecycle fields it must not set, runs `spec check` and
+  retries with the findings, then commits and, with a remote and `gh`/`glab`, opens a draft pull
+  request. It never approves and never merges. Claude Code runs restricted at the source (no
+  code-running tools, files confined to the folder); a `generic` agent (`tuvl agent use generic
+  --command '…'`) is checked afterwards only. Idea text is sent to the agent after a one-time consent.
+  `tuvl agent test` now runs the agent once on a trivial task; `tuvl spec import --commit` commits
+  the idea. A missing task list is now answered with `tuvl spec tasks`, not a request to the agent.
+
+- **Audit ledger.** Authoring actions (init, agent choice, idea import, renumber, spec create /
+  approve / reject / reopen, task derivation) are recorded, refusals included, in a local,
+  hash-chained `.tuvl/audit/` ledger; `tuvl audit log|show|verify|export|prune` read it, and `tuvl
+  doctor` verifies it. Prompts and agent output go to `.tuvl/trace/`, referenced by hash. `tuvl spec
+  status --watch` refreshes the derived task status live and shows `codegen` progress from
+  `.tuvl/live/tasks.json`.
+
+- **Spec approval and derived task lists.** `tuvl spec approve` records who approved a spec and a hash of
+  its body; editing the body afterwards makes the approval stale (new check S017) and the spec a draft
+  again. `reject` and `reopen` send it back; `tuvl spec list` shows the state. `tuvl spec tasks` derives
+  the task list from an approved spec with no model: one task per new model, step and example, plus a
+  manual task for each external-system step; re-running keeps ids and marks removed items `obsolete`.
+  `tuvl spec new --idea` numbers and links a spec; checks S018–S021 cover the idea links.
+
+- **Ideas.** `tuvl spec import <file-or-folder>` copies an idea into `idea/IDEA-<INITIALS>-NNNN/`
+  with a record of every file's hash and the text of Word files and PDFs (`tuvl[pdf]`) extracted
+  beside them; `tuvl spec ideas`, `tuvl spec idea <id>` and `tuvl spec renumber <id>` list, show and
+  renumber them. Ids are hierarchical: `SPEC-SK-0004-01` and `TASK-SK-0004-01-003` inherit their
+  idea's number, and a task list may use these ids (the `T1` form still works). `tuvl doctor` has an
+  `ideas` group.
+
+- **`tuvl init` asks who you are and which coding agent to use.** It detects the coding agents on
+  your machine, asks your initials and which agent tuvl may run for you (or none), and writes both
+  to the git-ignored `.tuvl/agent.yaml`. It also runs `git init` on branch `develop` when git is
+  installed (`--no-git`, `--branch`, `--commit`). New options: `--agent`, `--no-agent`,
+  `--list-agents`, `--initials`. The new `tuvl agent list|use|test` shows and changes the choice,
+  and `tuvl doctor` has an `agent` group.
+
+- **`tuvl doctor` checks the whole project.** Named groups (`project`, `env`, `config`, `models`,
+  `storage`, and with the toolchain `git` and `skills`), `--only` / `--skip`, `--strict`, `--quiet`,
+  and `--fix` for the safe repairs (`git init -b develop`, ignoring `.env`). `--json` keeps `healthy`,
+  `models` and `storage` and adds `groups`, `summary`, `checks` and `fixed`.
+
+- **A bare `pip install tuvl` is the production CLI.** It offers `run`, `runs`, `db`, `keys`, `doctor`
+  and `storage`. The developer commands (`init`, `dev`, `validate`, `ship`, `deploy`, `test`,
+  `codegen`, `lock`, `mcp`, `spec`, `skills`, `project`) appear when the toolchain extras are installed
+  (`tuvl[standard]`); without them each answers with the install hint and exits 2.
+- **`tuvl init` template:** `requires-python` is `>=3.13,<3.15` (it was `<3.14`), and `prerelease =
+  "allow"` is written while the pinned tuvl is a prerelease, so a new project resolves on Python 3.14
+  and on a beta.
+
+## [2.0.0-beta.6] — 2026-10-19
+
+- **Project registration: organization.** The project record gains `organization` and an optional
+  `organization_url` (`tuvl project set organization …`, and Insight → Settings → Project). The
+  author and email are now always sent when you register, so the hub can reach the developer; the hub
+  keeps them private. The `--public-email` flag and its Insight checkbox are removed. The catalogue
+  lists the name, version, organization (linked), type, license, description and the repository link.
+
+## [2.0.0-beta.5] — 2026-10-18
+
+- **`tuvl deploy` announces managed hosting.** The command exists so the name is reserved and
+  discoverable: it explains that deploying to a hosted, managed tuvl engine is coming, points to
+  `tuvl ship` for today, deploys nothing and exits 1 so a script cannot mistake it for a deployment.
+- **License: Apache License 2.0.** Starting with `2.0.0b5`, tuvl and tuvl-insight are licensed
+  under the Apache License, Version 2.0, which includes an express patent grant. You can use,
+  modify, distribute and sell software built on tuvl, and contributions are accepted under the same
+  license. A `NOTICE` file travels with every distribution, changed files in a redistribution
+  should say so, and the name and logos are not licensed as a brand (§6). Earlier releases keep the
+  terms they were published with. The wheels now declare `License-Expression: Apache-2.0` and
+  include `LICENSE`, `NOTICE` and, for tuvl-insight, `THIRD_PARTY_LICENSES.txt` (the notices of the
+  JavaScript packages compiled into the UI; `make ui-notices` regenerates it) and the SIL Open Font
+  License text for the bundled Geist fonts. `tuvl init` no longer writes a license into a new
+  project's `pyproject.toml`: that choice is yours. `SECURITY.md` lists 2.x as supported.
+- **Blob storage.** Workflows can read and write files through named stores declared in
+  `storage/*.yaml` (`kind: Storage`): S3 and every S3-compatible service (MinIO, R2, Wasabi, Spaces,
+  B2), Azure Blob Storage, Google Cloud Storage and local disk. `tool: { use: storage }` adds
+  `put`, `get`, `head`, `list`, `copy`, `delete` and `presign`; code agents get `ctx.storage(name)`.
+  The client is plain httpx with built-in request signing (SigV4, Shared Key, SAS, OAuth), so the
+  install grows by no packages. Credentials resolve from keys, the environment, web identity,
+  container and instance roles, and Azure and GCP identities. `tuvl storage check|ls`, `tuvl doctor`
+  and an Insight Storage page; validator rules V030–V034 and a new reserved signal `too_large`.
+  See `docs/storage.md`.
+- **OTLP over HTTP by default.** Span and metric export now uses OTLP/HTTP (`http/protobuf`, port
+  4318) instead of gRPC, which removes `grpcio` from the install — about 35 MB. **Breaking for
+  telemetry users:** the default endpoint is `http://localhost:4318`, and a collector reached on
+  `:4317` needs `TUVL_OTLP_PROTOCOL=grpc` plus `pip install 'tuvl[otel-grpc]'`. tuvl logs a warning
+  at startup when an HTTP exporter points at `:4317`. `OTEL_EXPORTER_OTLP_PROTOCOL` is honoured,
+  and `.tuvl/telemetry.yaml` gains `otlp_protocol` (also a field in Insight → Settings → Telemetry).
+- **litellm removed.** tuvl calls models through its own client (`tuvl.llm`, httpx only), so the
+  install drops litellm and the packages only it needed — about 175 MB of site-packages (including
+  the `google-cloud-aiplatform` stack of the `[google]` extra) and a 2.7 s first-call import. Model
+  ids stay `provider/model`. Built in: OpenAI, Anthropic (native Messages API, structured output
+  through a forced tool), Gemini, Ollama, Groq, Mistral, DeepSeek, xAI, OpenRouter, Together,
+  Fireworks, Perplexity, LM Studio and vLLM, plus Azure OpenAI (v1 endpoint), Bedrock
+  (`bedrock-runtime` with a Bedrock API key), Vertex AI (OpenAI endpoint with an access token), Cohere
+  and Voyage (embeddings) through the vendors' OpenAI-compatible APIs. Any other OpenAI-compatible
+  endpoint works with `api_base`, including a LiteLLM proxy (`litellm_proxy/<alias>`); SageMaker,
+  watsonx, Hugging Face and Replicate need a gateway. Embedding entries accept `api_base` and `api_key`
+  (an `${ENV_VAR}` reference), also editable in Insight. Model calls emit `gen_ai.*` spans on their own, without a
+  callback. See `docs/models.md`.
+- **Changed:** decision-model `provider: litellm` is now `provider: llm` (`litellm` is still read
+  as an alias). `tuvl init` writes `OLLAMA_BASE_URL` (was `LITELLM_OLLAMA_BASE_URL`) and, for a custom
+  endpoint, `LLM_API_BASE` (was `LITELLM_PROXY_BASE_URL`); the unused `litellm_proxy_base_url` setting
+  is gone.
+- **`tuvl ship` installs only what a project uses.** `redis`, `pgvector`, `mcp`, `libcst` and
+  `aiosqlite` are no longer base dependencies of `tuvl`; they are the extras `tuvl[redis]`,
+  `tuvl[vector]`, `tuvl[mcp]`, `tuvl[otel-grpc]`, `tuvl[codegen]` and `tuvl[test]`, and `tuvl[standard]` includes all
+  of them, so a development install is unchanged. `tuvl ship` reads the workflows (an `mcp` tool or
+  export, a redis datasource, collections or `tuvl.data_*`) and the imports of `agents/*.py`, writes
+  `tuvl[<only those>]==<locked version>` into the Dockerfile and records it as the image label
+  `io.tuvl.extras`. It refuses an import that `pyproject.toml` does not declare, lists declared
+  packages nothing imports, and stops when a kept `deploy/Dockerfile` lacks an extra the project now
+  needs. `--extra NAME` adds one the scan cannot see. A feature used without its extra fails with
+  `pip install 'tuvl[name]'`. A bare `pip install tuvl` is about 13 MB smaller. A missing pgvector is
+  now logged at info, not warning.
+- **Fan-out: the `map` engine (TD-52).** `engine: map` runs a child workflow once per item of a
+  list, `concurrency` items at a time, and returns the results in input order. Each item is a child
+  run with its own journal; a parent that is reclaimed after a crash follows the children it already
+  started, so no item runs twice. `on_error: fail` stops at the first failed item; `collect` keeps
+  going and emits `partial`. A mapped workflow must finish on its own (no human steps), recursion is
+  cut by `policy.max_depth`, and `tuvl validate` prices the step at the child's worst case times
+  `max_items` (V035, V036). Specs can describe it (`map <workflow>`), and Insight draws, adds and
+  traces it. This is a map over one workflow, not a fork/join of different branches.
+- **Multi-tenant runs (TD-40).** In `multi_tenant` mode a run now belongs to a tenant: the run,
+  journal, checkpoint and approval tables actually get their `tenant_id` column (the injection
+  never fired before, so every run was `default_tenant`; existing databases are upgraded at boot),
+  starting a run requires a tenant, workers execute it under that tenant with the row-level-security
+  variable set, and callers reach only their own tenant's runs (`iam:admin` and `runs:control`
+  included; another tenant's run is a `404`). Scheduled workflows no longer refuse multi-tenant
+  mode: `trigger.tenants: [acme, globex]` starts one run per tenant per slot.
+- **Workflows that name a disabled model are refused (TD-56)** with the reason (`409` over REST)
+  instead of failing at their first `db` call; Insight shows why on the workflow.
+- **Insight Models page keeps `secure` (TD-58).** Editing a model used to drop `secure: true`; the
+  flag now has a column and survives a save.
+- **Releases (TD-34):** `make bump VERSION=x.y.z` and `make check-version` replace the unused
+  release-please setup. **Tests (TD-59, TD-60):** a steadier heartbeat test and a 180 s per-test
+  timeout. **Cleanup (TD-57):** the unused 1.x `/dev/agents/{name}` file endpoints are gone.
+
+## [2.0.0-beta.4] — 2026-10-16
+
+- **Project identity.** `tuvl init` writes `.tuvl/project.yaml` with an immutable, self-checking id
+  (`prj_<uuidv7>-<check>`; commands refuse an id that fails the check), author,
+  email, type (`poc`/`dev`/`production`) and version. `tuvl project info|set|init|register` and an
+  Insight **Settings → Project** page read and edit it. Insight can also register the project with
+  the catalogue (payload preview, GitHub device login) and flags a listing that is out of date.
+  The description is Markdown (2000 characters): `tuvl project set description @about.md` or `-`
+  for stdin, rendered by `project info`, Insight's preview and the hub. `tuvl project init --new-id`
+  re-mints the id of a copied project. The public catalogue at hub.tuvl.io is not live yet; `--hub`
+  or `TUVL_HUB_URL` point registration at another hub. See `docs/project.md`.
+- **GitHub device login.** `POST /auth/oauth/{provider}/device/start|poll` lets a CLI sign in with
+  GitHub without a browser callback; `allowed_users` restricts GitHub logins by handle.
+- **Changed:** the browser OAuth redirect now carries the token in the URL fragment
+  (`…#token=…`), not the query string.
+
+## [2.0.0-beta.3] — 2026-10-14
+
+- **Insight: workflow groups and a tile picker.** `metadata.group` is accepted again, so workflows
+  group the way they did in 1.0. Clicking the workflow name (or ⌘K) opens a panel of tiles, grouped
+  and searchable, below the top bar; picking one closes it. The Start panel has a Group field and
+  new workflows can be created into a group.
+- **Insight: workflow access is visible.** The START node and a top-bar chip show who can run the
+  workflow (IAM role, scope, public or any signed-in user); the chip opens the access editor.
+- **Insight: black, white and cyan theme**, in dark and light, in step with tuvl.io and tuvl.dev.
+  The canvas follows the theme.
+- **Insight: node icons and hover details.** One icon per engine kind (pending is an hourglass), the
+  breakpoint dot shows on hover, and a read-only popover shows a node's details and validation
+  messages.
+
+## [2.0.0-beta.2] — 2026-10-14
+
+- **Laya from Docker Hub, English-only by default.** `tuvl init --decision-model laya` and
+  `tuvl ship` use the published `tuvl/laya-serve` image. `init` scaffolds `model: english` with the
+  English-only `-en` image (about 0.8 GB smaller, about 2 GiB of memory); `ship` picks the `-en`
+  image for `model: english` and the full image for `auto` / `multilingual`, with matching memory
+  requests in the Helm chart.
 
 ## [2.0.0] — 2026-10-10
 
@@ -34,7 +616,7 @@ load with an error pointing at the 2.0 format.
   be a hosted model behind an OpenAI-compatible endpoint (`api_base` +
   `${ENV}` `api_key` on `type: decision`). **Laya and Jev** are built in over
   System One (`POST /v1/systemone`): `tuvl init --decision-model laya`
-  scaffolds a self-hosted Laya (laya-serve container) and `tuvl ship` adds it
+  scaffolds a self-hosted Laya (the `tuvl/laya-serve` image on Docker Hub, amd64 and arm64) and `tuvl ship` adds it
   to the Helm chart (`--with-laya/--without-laya`); `loop` tools are
   agents, child workflows or allow-listed MCP tools, with per-tool approval,
   budgets and a supervisor. **Judges** are calibrated, cached artifacts.
@@ -66,7 +648,7 @@ load with an error pointing at the 2.0 format.
   unrouted engine signals, unreachable ends, unsafe model steps, data-flow gaps, secure fields reaching
   a model, name collisions, missing access, bad rules and loop tools. It is the first step of the CI
   gate. `tuvl spec new` and the `--sample` spec use the grammar.
-- **Fixes from the sdp-cop live demo.** `tuvl.data_search` failed on a `filter` rendered from a uuid
+- **Fixes from a live demo.** `tuvl.data_search` failed on a `filter` rendered from a uuid
   input (`community_id: "{{ community_id }}"`) — filters are JSON-encoded like ingest metadata now.
   A code agent's input model was cached by workflow and agent id only, so an edited contract kept
   validating against the old one until restart; the contract is part of the key now.
@@ -76,7 +658,7 @@ load with an error pointing at the 2.0 format.
   AgentModel with the agent's contract, its models' fields and the `agent-code` skill; it returns the
   whole file into the editor and never saves. `GET|PUT /dev/agents/{run}/source`,
   `POST /dev/agents/{run}/assist`, `GET /dev/agents/assist/models` (dev mode only).
-- **Dogfooding fixes (sdp-cop built end to end with the skills).** Spec grammar: compensators
+- **Dogfooding fixes (a project built end to end with the skills).** Spec grammar: compensators
   (`compensate `x`` + `T` step) and `- tests: waived — why`; `spec check` resolves an `(existing)`
   model to the project's schema and flags reserved signals routed from `code` steps (as the validator
   does); `spec verify` compares defaults by value (`false` = `False`) and checks `compensate`; task
@@ -133,8 +715,8 @@ with `spec.api.crud`. The 2.0 examples (`tuvl-io/examples`) show each pattern.
   services — `ExecutionService`, `DevService`, `IamService` — are gone, along
   with the `grpcio`, `sonora` and `grpcio-tools` dependencies, `make proto`,
   `make apply-patches` and the vendored sonora patch. REST + SSE is the only
-  application transport. (OTLP span export to a collector still uses gRPC;
-  that is telemetry, not the API.)
+  application transport. (OTLP export to a collector is separate: it uses
+  HTTP by default, see above.)
 - The 1.x Insight AI code chat (`POST /dev/ai/chat`) and the UI's unused 1.x
   workflow, Lens and Spectrum types. Code agents are written in an editor or by
   a coding agent using `tuvl mcp`.

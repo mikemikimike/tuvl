@@ -19,6 +19,7 @@ carry a name the rest of the system would reject.
 
 from __future__ import annotations
 
+import math
 import re
 import time
 import uuid
@@ -71,8 +72,9 @@ def mint_token(
         "sub": user_id,
         "groups": list(groups),
         "scopes": list(scopes),
-        # ms precision: a session ended now must refuse a token issued a moment before
-        "iat": round(now, 3),
+        # ms precision: a session ended now must refuse a token issued a moment before.
+        # Floored, never rounded up: an iat in the future makes jwt.decode reject the token.
+        "iat": math.floor(now * 1000) / 1000,
         "jti": uuid.uuid4().hex,
     }
     if tenant_id is not None:

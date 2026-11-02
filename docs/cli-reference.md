@@ -217,7 +217,7 @@ List this project in the public catalogue (shows the payload first).
 
 ### `tuvl update skills`
 
-Refresh AGENTS.md and the skills to this tuvl version (removes the 1.x skills).
+Refresh AGENTS.md and the skills to this tuvl version (removes the retired skills).
 
 | Option | Value | Default | What it does |
 |---|---|---|---|

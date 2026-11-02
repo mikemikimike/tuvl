@@ -66,7 +66,7 @@ Folder names are conventions: discovery is recursive and dispatched by `kind:`.
 | `ProjectConfig`, `TelemetryConfig`, `SystemConfig` | Project and system settings |
 
 Every document uses the envelope `kind` + `metadata` + `spec`. `Workflow`, `Test` and `TaskPlan`
-carry `version: tuvl/v2`; a 1.x-shaped workflow fails to load.
+carry `version: tuvl/v2`; a workflow in the old `steps:` format fails to load.
 
 ### Artifact types (closed set)
 

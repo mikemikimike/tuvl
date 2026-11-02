@@ -10,9 +10,23 @@ Releases are cut by hand: `make bump VERSION=x.y.z`, update this file, tag `vX.Y
 
 ## [Unreleased]
 
+---
+
+## [2.0.1] — 2026-11-02
+
+A patch release of `tuvl` and `tuvl-insight`: two small fixes found when CI first ran on freshly booted GitHub-hosted machines, the PyPI project descriptions, and the release workflow.
+
+### Fixed
+
+- **A token's `iat` is never ahead of the clock.** `mint_token` rounded `iat` to the millisecond with `round()`, which can round up by half a millisecond, and `jwt.decode` rejects an `iat` in the future. A token verified within that window of being minted failed with `ImmatureSignatureError`. `iat` is now floored to the millisecond (same precision).
+- **The first memory-retention and draft sweeps no longer wait for the machine to have been up.** Both throttles compared `time.monotonic()` (seconds since boot) with a last-run value of `0.0`, so on a machine up for less than the interval (5 minutes, and 1 minute) the first sweep was skipped. They now start open.
+- **`tuvl-insight` has a project description on PyPI.** Its `pyproject.toml` had no `readme`, so the project page said the author had not provided one.
+
 ### Changed
 
 - **PyPI descriptions follow the current positioning.** `tuvl` and `tuvl-insight` open with "Intelligent workflows, deterministic execution" and say what the package does; `tuvl-insight` had no project description and now ships a README. Both explain PyPI's "repository or configuration differs from a previous release" notice and how to verify a release.
+- **Releases publish from the public repository only, with provenance checked.** The publish jobs check out the provenance script they run, `uv publish` skips files PyPI already has, and a manual run can set `skip_tuvl` to publish only `tuvl-insight` (this is how `tuvl-insight` 2.0.0 was published: the `v2.0.0` run uploaded `tuvl`, then stopped on the missing script).
+- Dependabot pull requests target `develop`, like every other change.
 
 ---
 

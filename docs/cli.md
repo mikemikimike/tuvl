@@ -48,7 +48,7 @@ Each verb makes one kind of promise, so the name tells you what a command will d
 | `tuvl list team-activity` | `--actor`, `--entity`, `--kind`, `-n`, `--json` | What the team did on this project, from the collector |
 | `tuvl set project FIELD VALUE` | | Update `name`, `author`, `email`, `type`, `version`, `description`, `license` or `repo` (validated). The description is Markdown (up to 2000 characters): `VALUE` of `@about.md` reads a file, `-` reads stdin; `show project` renders it |
 | `tuvl register project` | `--nest URL`, `-y` | List the project in the public catalogue. Prints the exact payload first and asks; signs in with GitHub's device flow; the author and email are sent for contact and never shown publicly. Also available as Insight → Settings → Project → Register / Update listing (same payload preview and login) |
-| `tuvl update skills` | `--diff` | Refresh `AGENTS.md` and `.agents/skills/` to this tuvl version (removes 1.x skills; mirrors to `.claude/skills/`) |
+| `tuvl update skills` | `--diff` | Refresh `AGENTS.md` and `.agents/skills/` to this tuvl version (removes retired skills; mirrors to `.claude/skills/`) |
 
 ## Specs
 

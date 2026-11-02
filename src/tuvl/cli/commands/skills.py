@@ -26,7 +26,7 @@ def update_cmd(
         bool, typer.Option("--diff", help="Show what would change; write nothing")
     ] = False,
 ) -> None:
-    """Refresh AGENTS.md and the skills to this tuvl version (removes the 1.x skills)."""
+    """Refresh AGENTS.md and the skills to this tuvl version (removes the retired skills)."""
     from tuvl import skills
 
     project = project_dir.resolve()

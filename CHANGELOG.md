@@ -10,6 +10,10 @@ Releases are cut by hand: `make bump VERSION=x.y.z`, update this file, tag `vX.Y
 
 ## [Unreleased]
 
+### Changed
+
+- **PyPI descriptions follow the current positioning.** `tuvl` and `tuvl-insight` open with "Intelligent workflows, deterministic execution" and say what the package does; `tuvl-insight` had no project description and now ships a README. Both explain PyPI's "repository or configuration differs from a previous release" notice and how to verify a release.
+
 ---
 
 ## [2.0.0] — 2026-11-01

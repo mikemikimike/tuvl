@@ -9,6 +9,10 @@ on:
       tag:
         description: "Tag to publish (must match a git tag, e.g. v2026.2.3-beta.1)"
         required: true
+      skip_tuvl:
+        description: "Skip publishing tuvl (PyPI already has it); publish only tuvl-insight"
+        type: boolean
+        default: false
 
 # Publishes from tuvl-io/tuvl only, the public repository: the PyPI trusted publisher, the attestations and the build
 # source are all that repository, so a package can be checked against code anyone can read. A tag pushed to the private
@@ -261,6 +265,7 @@ jobs:
   publish-tuvl:
     name: Publish tuvl to PyPI
     needs: build-tuvl
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_tuvl) }}
     runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
     environment: pypi
     permissions:
@@ -303,6 +308,8 @@ jobs:
   publish-insight:
     name: Publish tuvl-insight to PyPI
     needs: [build-insight, publish-tuvl]
+    # publish-tuvl is skipped on purpose when skip_tuvl is set; a skip caused by a failed build must not get here
+    if: ${{ !cancelled() && needs.build-insight.result == 'success' && (needs.publish-tuvl.result == 'success' || (github.event_name == 'workflow_dispatch' && inputs.skip_tuvl)) }}
     runs-on: ${{ github.event.repository.private && fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') || 'ubuntu-latest' }}
     environment: pypi
     permissions:
@@ -314,6 +321,15 @@ jobs:
           # only the provenance check script is needed here
           sparse-checkout: scripts/check_provenance.sh
           sparse-checkout-cone-mode: false
+
+      - name: tuvl must already be on PyPI
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.skip_tuvl }}
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          VERSION=$(echo "${INPUT_TAG#v}" | sed -E -e 's/-alpha\.([0-9]+)/a\1/' -e 's/-beta\.([0-9]+)/b\1/' -e 's/-rc\.([0-9]+)/rc\1/')
+          curl -fsS -o /dev/null "https://pypi.org/pypi/tuvl/${VERSION}/json" \
+            || { echo "::error::tuvl ${VERSION} is not on PyPI; run without skip_tuvl"; exit 1; }
 
       - name: Download tuvl-insight artifacts
         uses: actions/download-artifact@v4

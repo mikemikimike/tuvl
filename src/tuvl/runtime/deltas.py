@@ -165,7 +165,7 @@ async def running_agent(session: AsyncSession, run_id: uuid.UUID) -> str | None:
     return str(row[1]) if row is not None and row[0] == "agent_started" else None
 
 
-_last_sweep = 0.0
+_last_sweep = float("-inf")
 
 
 async def sweep(session: AsyncSession) -> int:

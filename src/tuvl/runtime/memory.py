@@ -147,7 +147,7 @@ async def remember(
 
 
 _RETENTION_EVERY = 300.0
-_last_retention = 0.0
+_last_retention = float("-inf")
 
 
 def retained_collections() -> dict[str, timedelta]:

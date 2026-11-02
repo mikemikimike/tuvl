@@ -127,7 +127,7 @@ async def test_the_sweep_removes_old_rows_and_a_finished_runs_after_the_grace(
             ]
         )
         await s.commit()
-    monkeypatch.setattr(deltas, "_last_sweep", 0.0)
+    monkeypatch.setattr(deltas, "_last_sweep", float("-inf"))
     async with AsyncSession(engine) as s:
         assert await deltas.sweep(s) == 2
         await s.commit()

@@ -267,6 +267,12 @@ jobs:
       id-token: write  # OIDC Trusted Publishing — no API token needed
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          # only the provenance check script is needed here
+          sparse-checkout: scripts/check_provenance.sh
+          sparse-checkout-cone-mode: false
+
       - name: Download tuvl artifacts
         uses: actions/download-artifact@v4
         with:
@@ -286,7 +292,8 @@ jobs:
       - name: Publish tuvl to PyPI
         # uv publish speaks OIDC trusted publishing too; the pypa action is a Docker action a macOS runner cannot run.
         # Pass dist/* (not *.whl and *.tar.gz): uv only attaches an attestation it finds in the list of files it is given.
-        run: uv publish --trusted-publishing always dist/*
+        # --check-url skips a file PyPI already has, so a re-run after a later step failed does not stop on a duplicate.
+        run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/*
 
       - name: Check PyPI kept the provenance
         # PyPI cannot add an attestation to a file after the upload, so a release without one stays without one
@@ -302,6 +309,12 @@ jobs:
       id-token: write  # OIDC Trusted Publishing — no API token needed
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          # only the provenance check script is needed here
+          sparse-checkout: scripts/check_provenance.sh
+          sparse-checkout-cone-mode: false
+
       - name: Download tuvl-insight artifacts
         uses: actions/download-artifact@v4
         with:
@@ -321,7 +334,8 @@ jobs:
       - name: Publish tuvl-insight to PyPI
         # uv publish speaks OIDC trusted publishing too; the pypa action is a Docker action a macOS runner cannot run.
         # Pass dist/* (not *.whl and *.tar.gz): uv only attaches an attestation it finds in the list of files it is given.
-        run: uv publish --trusted-publishing always dist/*
+        # --check-url skips a file PyPI already has, so a re-run after a later step failed does not stop on a duplicate.
+        run: uv publish --trusted-publishing always --check-url https://pypi.org/simple/ dist/*
 
       - name: Check PyPI kept the provenance
         # PyPI cannot add an attestation to a file after the upload, so a release without one stays without one

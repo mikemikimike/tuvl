@@ -1619,7 +1619,7 @@ wheels = [
 
 [[package]]
 name = "tuvl"
-version = "2.0.0"
+version = "2.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "asyncpg" },
@@ -1749,7 +1749,7 @@ dev = [
 
 [[package]]
 name = "tuvl-insight"
-version = "2.0.0"
+version = "2.0.1"
 source = { editable = "src/tuvl_insight" }
 dependencies = [
     { name = "tuvl" },

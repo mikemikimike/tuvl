@@ -4,9 +4,13 @@
 </p>
 
 <p align="center">
-  Typed workflows of agents — code, database/HTTP/MCP tools, rules, models,<br/>
-  bounded tool loops and people — on a durable, journaled runtime,<br/>
-  built spec-first and served as REST, SSE and MCP.
+  <strong>Intelligent workflows. Deterministic execution.</strong>
+</p>
+
+<p align="center">
+  Declare the workflow in YAML. tuvl checks it before it runs, bounds every model call,<br/>
+  journals every step and refuses anything the contract doesn't declare.<br/>
+  Python only where you need it. Served as REST, SSE and MCP.
 </p>
 
 <p align="center">
@@ -15,8 +19,7 @@
   <a href="https://github.com/tuvl-io/tuvl">GitHub</a>
 </p>
 
-> **tuvl 2.0** is a redesign with no 1.x compatibility layer — see the
-> [CHANGELOG](CHANGELOG.md). Versions follow [SemVer](https://semver.org).
+> Versions follow [SemVer](https://semver.org); every change is in the [CHANGELOG](CHANGELOG.md).
 
 A tuvl workflow is a graph of **agents**. Each agent has a typed contract — `inputs`, `outputs`, the
 signals it emits — and an **engine** that implements it:
@@ -146,7 +149,7 @@ tuvl review code && tuvl ship --format both      # gate, image and a runnable ar
 ## Production
 
 ```bash
-tuvl generate lock && tuvl ship --tag registry/app:1.0    # gates, Dockerfile (pinned tuvl + only the extras you use), Helm chart
+tuvl generate lock && tuvl ship --tag registry/app:prod    # gates, Dockerfile (pinned tuvl + only the extras you use), Helm chart
 tuvl serve app --role api        # or: worker — scale HTTP and execution separately
 ```
 
@@ -171,7 +174,7 @@ PyPI may show **"The repository or configuration that created this release diffe
 
 | Release | Published from |
 |---|---|
-| 1.0.1 and earlier | A build server, without provenance |
+| Releases before 2.0 | A build server, without provenance |
 | 2.0.0b1 to 2.0.0b10 | A private repository (`tuvl-io/tuvl-private`), with provenance for some of them |
 | 2.0.0 and later | This repository, `tuvl-io/tuvl` |
 

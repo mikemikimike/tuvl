@@ -163,6 +163,27 @@ fields kept away from models, optional Postgres row-level multi-tenancy.
 
 ---
 
+## Verifying a release
+
+From 2.0.0, `tuvl` and `tuvl-insight` are published to PyPI by a GitHub Actions workflow in this repository, using PyPI Trusted Publishing, and each file carries a signed [provenance attestation](https://docs.pypi.org/attestations/) naming this repository and `publish.yml`.
+
+PyPI may show **"The repository or configuration that created this release differs from a previous release"**. It compares each release's publisher with the previous one, and earlier releases came from elsewhere:
+
+| Release | Published from |
+|---|---|
+| 1.0.1 and earlier | A build server, without provenance |
+| 2.0.0b1 to 2.0.0b10 | A private repository (`tuvl-io/tuvl-private`), with provenance for some of them |
+| 2.0.0 and later | This repository, `tuvl-io/tuvl` |
+
+The publisher changed once, when the source moved here. The notice does not mean a release was altered. To check one yourself, run this in the folder you downloaded to:
+
+```bash
+pip download tuvl==2.0.0 --no-deps
+pypi-attestations verify pypi --repository https://github.com/tuvl-io/tuvl pypi:tuvl-2.0.0-py3-none-any.whl
+```
+
+More in the [installation guide](https://tuvl.dev/getting-started/installation/#verifying-a-release-and-the-pypi-provenance-notice).
+
 ## License & contributing
 
 tuvl is licensed under the **Apache License, Version 2.0** — see [LICENSE](LICENSE) and

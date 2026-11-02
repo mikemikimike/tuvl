@@ -5,10 +5,8 @@ All notable changes to **tuvl** are recorded here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 this project follows [Semantic Versioning](https://semver.org) as of `1.0.0`.
 Releases are cut by hand: `make bump VERSION=x.y.z`, update this file, tag `vX.Y.Z`.
-
----
-
-## [Unreleased]
+Changes that have not shipped yet are listed under an `[Unreleased]` heading at the top; when there are none, the newest
+release below is the current one.
 
 ---
 
